@@ -8,7 +8,7 @@ import { blockColor } from './blockColors.js';
 const REACH = 6;
 // seconds to break (hold LMB); Infinity = unbreakable
 const HARDNESS = { stone: 0.9, cobblestone: 0.9, bricks: 0.9, sandstone: 0.7, coal_ore: 1.1, iron_ore: 1.3, gold_ore: 1.3, diamond_ore: 1.6, bedrock: Infinity,
-  dirt: 0.35, grass: 0.4, snowy_grass: 0.4, sand: 0.3, gravel: 0.35, snow: 0.2, ice: 0.3, oak_log: 0.7, birch_log: 0.7, spruce_log: 0.7, planks: 0.5,
+  tnt: 0.05, dirt: 0.35, grass: 0.4, snowy_grass: 0.4, sand: 0.3, gravel: 0.35, snow: 0.2, ice: 0.3, oak_log: 0.7, birch_log: 0.7, spruce_log: 0.7, planks: 0.5,
   oak_leaves: 0.12, birch_leaves: 0.12, spruce_leaves: 0.12, glass: 0.2, glowstone: 0.3, cactus: 0.25, lava: 0.2 };
 const breakTime = (id) => (RENDER[id] === RENDER_CROSS ? 0 : (HARDNESS[BLOCKS[id] ? BLOCKS[id].name : ''] ?? 0.6));
 
@@ -61,6 +61,12 @@ export class Interaction {
     this.scene.add(this.outline, this.crack);
     this.particles = new Particles(this.scene);
     this.enabled = true;
+    /** Items feature: (dt, mouse, hit) => 0 normal block play | 1 item in hand (no block interaction) | 2 tool (breaking allowed, no placing) | 3 item that only shows the outline */
+    this.itemHook = null;
+    /** multiplier on mining speed while a tool is in hand (set by the items feature) */
+    this.breakMul = 1;
+    /** permission gate: (action 'break'|'place', {x,y,z,id}) => boolean; onDenied(action) tells the player why nothing happened */
+    this.permit = null; this.onDenied = null;
   }
 
   /** @param {number} dt  @param {{breakHeld:boolean, placeHeld:boolean, placePressed:boolean, pickPressed:boolean}} m  @param {number} pxPerUnit */
@@ -72,6 +78,13 @@ export class Interaction {
     this._origin.copy(this.camera.position);
     const hit = this.world.raycast(this._origin, this._dir, REACH);
     this.hit = hit;
+    const ih = this.itemHook ? this.itemHook(dt, m, hit) : 0;
+    if (ih === 1 || ih === 3) { // an item is in hand: it owns the mouse
+      this._resetBreak(); this._consume(m);
+      this.outline.visible = ih === 3 && !!hit;
+      if (hit) this.outline.position.set(hit.x + 0.5, hit.y + 0.5, hit.z + 0.5);
+      return;
+    }
     if (!hit) { this.outline.visible = false; this._resetBreak(); this._consume(m); return; }
     this.outline.visible = true; this.outline.position.set(hit.x + 0.5, hit.y + 0.5, hit.z + 0.5);
 
@@ -83,12 +96,12 @@ export class Interaction {
       }
       const bt = breakTime(hit.block);
       if (bt !== Infinity && this._cool <= 0) {
-        this.progress += bt <= 0 ? 1 : dt / bt;
+        this.progress += bt <= 0 ? 1 : dt / bt * (ih === 2 ? this.breakMul : 1);
         if (this.progress >= 1) this._break(hit); else this._showCrack(hit);
       }
     } else this._resetBreak();
     // --- place
-    if (m.placePressed || (m.placeHeld && this._placeCool <= 0)) { if (this._place(hit)) this._placeCool = 0.22; }
+    if (ih !== 2 && (m.placePressed || (m.placeHeld && this._placeCool <= 0))) { if (this._place(hit)) this._placeCool = 0.22; }
     // --- pick
     if (m.pickPressed && hit && this.onPick) this.onPick(hit.block);
     this._consume(m);
@@ -109,6 +122,7 @@ export class Interaction {
 
   _break(hit) {
     const w = this.world, id = hit.block;
+    if (this.permit && !this.permit('break', { x: hit.x, y: hit.y, z: hit.z, id })) { this.progress = 0; if (this.onDenied) this.onDenied('break'); this._cool = 0.5; return; }
     if (!w.setBlock(hit.x, hit.y, hit.z, B.AIR)) { this.progress = 0; return; }
     this.particles.burst(hit.x + 0.5, hit.y + 0.5, hit.z + 0.5, blockColor(id), 20);
     // plants need support: pop the one above
@@ -120,13 +134,14 @@ export class Interaction {
 
   _place(hit) {
     const id = this.getSelected();
-    if (!id) return false;
+    if (!id || typeof id !== 'number') return false;
     let x = hit.x, y = hit.y, z = hit.z;
     if (RENDER[hit.block] !== RENDER_CROSS) { x += hit.nx; y += hit.ny; z += hit.nz; } // placing onto a plant replaces it
     if (y < 0 || y >= WORLD_HEIGHT) return false;
     const cur = this.world.getBlock(x, y, z);
     if (cur !== B.AIR && !LIQUID[cur] && RENDER[cur] !== RENDER_CROSS) return false;
     if (SOLID[id] && this.player.intersectsBlock(x, y, z)) return false;
+    if (this.permit && !this.permit('place', { x, y, z, id })) { if (this.onDenied) this.onDenied('place'); return false; }
     if (!this.world.setBlock(x, y, z, id)) return false;
     if (this.onPlace) this.onPlace(id);
     return true;

@@ -25,13 +25,35 @@ export class Player {
     this.sprinting = false; this.crouching = false; this.frozen = false;
     this.flySpeed = 14;
     this.fovBase = 75; this.fovCur = 75;
+    /** gameplay FOV modifiers: additive kick (dash) and multiplier (scope) */
+    this.fovExtra = 0; this.fovMul = 1;
     this.autoWalk = false; this.autoStep = false;
+    // --- gameplay hooks (items feature / planets / minigames) ---
+    /** multiplier on gravity (planets set it; 1 = Earth-like) */
+    this.gravityScale = 1;
+    /** extra mid-air jumps (double jump = 1) */
+    this.extraJumps = 0;
+    /** 'normal' | 'off' (off = the fly toggle is ignored and flight is cancelled) */
+    this.flyMode = 'normal';
+    /** multiplier on walking / sprinting speed (speed boots) */
+    this.speedMul = 1;
+    /** > 0 caps the falling speed (feather / slow fall), in blocks per second */
+    this.fallCap = 0;
+    /** external acceleration (blocks/s^2) applied during the NEXT update only, then cleared (jetpack, grappling hook) */
+    this.accel = { x: 0, y: 0, z: 0 };
     /** Filled by Controls every frame. */
     this.input = { fwd: 0, strafe: 0, jump: false, sprint: false, crouch: false };
     /** Event callbacks (set by main): onStep(blockUnderFeet, sprinting), onLand(speed), onSplash(speed). */
     this.onStep = null; this.onLand = null; this.onSplash = null;
     this._bob = 0; this._bobAmt = 0; this._eye = EYE; this._camOff = 0; this._stepDist = 0; this._wasWater = false;
-    this._hHit = false;
+    this._hHit = false; this._kbT = 0; this._jumpPrev = false; this._jumpsLeft = 0;
+  }
+
+  /** Knockback / launch: adds to the velocity; ground friction is softened for a moment so the push is felt. */
+  impulse(vx, vy, vz) {
+    this.vx += vx; this.vy += vy; this.vz += vz;
+    if (vy > 0.5) this.onGround = false;
+    this._kbT = 0.4;
   }
 
   /** Teleport feet to (x,y,z) and clear velocity. */
@@ -70,6 +92,7 @@ export class Player {
       const n = Math.min(8, Math.ceil(dt * 90));
       const h = dt / n;
       for (let i = 0; i < n; i++) this._step(h);
+      const a = this.accel; a.x = a.y = a.z = 0;
     }
     this.updateCamera(dt);
   }
@@ -103,9 +126,10 @@ export class Player {
       this.vz += (wishZ * sp - this.vz) * k;
       this.vy += (vy * sp * 0.7 - this.vy) * k;
     } else {
-      let speed = this.crouching ? SPEED_CROUCH : this.sprinting ? SPEED_SPRINT : SPEED_WALK;
+      let speed = (this.crouching ? SPEED_CROUCH : this.sprinting ? SPEED_SPRINT : SPEED_WALK) * this.speedMul;
       let k;
       if (this.inWater) { speed *= SWIM_K; k = 1 - Math.exp(-5 * h); } else k = this.onGround ? 1 - Math.exp(-14 * h) : 1 - Math.exp(-3.2 * h);
+      if (this._kbT > 0) { this._kbT -= h; k *= 0.12; }
       this.vx += (wishX * speed - this.vx) * k;
       this.vz += (wishZ * speed - this.vz) * k;
       if (this.inWater) {
@@ -115,11 +139,19 @@ export class Player {
         else if (inp.crouch) this.vy = Math.max(-4, this.vy - 18 * h);
         if (inp.jump && this._hHit) this.vy = Math.max(this.vy, 6.5); // hop out of the water
       } else {
-        this.vy = Math.max(-TERMINAL, this.vy - GRAVITY * h);
+        this.vy = Math.max(-TERMINAL, this.vy - GRAVITY * this.gravityScale * h);
+        if (this.fallCap > 0 && this.vy < -this.fallCap) this.vy = -this.fallCap;
         if (inp.jump && this.onGround) { this.vy = JUMP_V; this.onGround = false; }
+        else if (this.extraJumps > 0) {
+          if (this.onGround) this._jumpsLeft = this.extraJumps;
+          else if (inp.jump && !this._jumpPrev && this._jumpsLeft > 0) { this._jumpsLeft--; this.vy = JUMP_V * 0.92; }
+        }
+        const ac = this.accel;
+        if (ac.x !== 0 || ac.y !== 0 || ac.z !== 0) { this.vx += ac.x * h; this.vy += ac.y * h; this.vz += ac.z * h; if (ac.y > 0) this.onGround = false; }
       }
     }
 
+    this._jumpPrev = inp.jump;
     // integrate with axis-separated, sub-stepped collision
     const wasGround = this.onGround, px = this.x, pz = this.z;
     this._hHit = false;
@@ -208,7 +240,8 @@ export class Player {
     // FOV kick
     const hs = Math.hypot(this.vx, this.vz);
     const kick = this.sprinting && hs > 5 ? 7 : this.flying && hs > 20 ? 6 : 0;
-    const target = this.fovBase + kick;
+    this.fovExtra *= Math.exp(-6 * dt);
+    const target = (this.fovBase + kick + this.fovExtra) * this.fovMul;
     this.fovCur += (target - this.fovCur) * (1 - Math.exp(-8 * dt));
     if (Math.abs(cam.fov - this.fovCur) > 0.02) { cam.fov = this.fovCur; cam.updateProjectionMatrix(); }
   }

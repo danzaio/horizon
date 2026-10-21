@@ -35,6 +35,23 @@ for (let b = 0; b < BIOME_COUNT; b++) {
   TINT_TABLE.set(T[b].slice(3, 6), (b * 4 + 2) * 3);
   TINT_TABLE.set(T[b].slice(6, 9), (b * 4 + 3) * 3);
 }
+// --- planets: per-profile tint table (never mutates TINT_TABLE). Palette colours are the PLAINS tint; the other biomes keep their relative variation.
+const BASE = { grass: [128, 188, 78], foliage: [92, 156, 52], water: [60, 120, 215] };
+/**
+ * @param {{palette?:{grass:number[],foliage:number[],water:number[]}}|null} profile
+ * @returns {Uint8Array} same layout as TINT_TABLE (the global table itself when there is no profile)
+ */
+export function makeTintTable(profile) {
+  if (!profile || !profile.palette) return TINT_TABLE;
+  const out = new Uint8Array(TINT_TABLE), pal = profile.palette, keys = ['grass', 'foliage', 'water'];
+  for (let b = 0; b < BIOME_COUNT; b++) {
+    for (let k = 0; k < 3; k++) {
+      const o = (b * 4 + 1 + k) * 3, key = keys[k];
+      for (let c = 0; c < 3; c++) { const v = TINT_TABLE[o + c] * (pal[key][c] / BASE[key][c]); out[o + c] = v > 255 ? 255 : v < 0 ? 0 : v; }
+    }
+  }
+  return out;
+}
 /** Per-biome tree density (probability per 4x4 cell) */
 export const TREE_DENSITY = new Float32Array(BIOME_COUNT);
 TREE_DENSITY[BIOME.FOREST] = 0.5; TREE_DENSITY[BIOME.BIRCH] = 0.42; TREE_DENSITY[BIOME.TAIGA] = 0.38;
@@ -53,12 +70,23 @@ function spline(x) {
   return SP_Y[SP_Y.length - 1];
 }
 
+// The planet the main thread is playing on: World registers it so main.js's own createTerrain(seed) (weather / mob biome lookups) matches the world.
+// Workers pass the profile explicitly (null = legacy world) and never read this.
+let defaultProfile = null;
+/** @param {object|null} p validated PlanetProfile of the running world */
+export function setDefaultProfile(p) { defaultProfile = p || null; }
+
 /**
  * Create the terrain function set for a seed.
  * @param {number} seed
  */
-export function createTerrain(seed) {
+export function createTerrain(seed, profile = defaultProfile) {
   seed = seed | 0;
+  // planet parameters; the neutral values (0 / 1) leave every expression below bit-identical to the legacy world
+  const PT = (profile && profile.terrain) || {}, PC = (profile && profile.climate) || {};
+  const cBias = PT.heightBias || 0, mScale = PT.mountainScale ?? 1, hScale = PT.hillScale ?? 1, rScale = PT.riverScale ?? 1, lScale = PT.lakeScale ?? 1;
+  const tBias = PC.tempBias || 0, hBias = PC.humBias || 0, cSpread = PC.spread ?? 1, snowOff = PC.snowLine || 0;
+  const tint = makeTintTable(profile);
   const nWarpA = new Noise(seed + 11), nWarpB = new Noise(seed + 12), nCont = new Noise(seed + 13), nMask = new Noise(seed + 14);
   const nRidge = new Noise(seed + 15), nHill = new Noise(seed + 16), nHillAmp = new Noise(seed + 17), nDet = new Noise(seed + 18);
   const nRiver = new Noise(seed + 19), nRivMask = new Noise(seed + 20), nLake = new Noise(seed + 21);
@@ -75,7 +103,7 @@ export function createTerrain(seed) {
   function columnInfo(x, z, oct, out) {
     const wx = x + 90 * nWarpA.n2(x * 0.0016, z * 0.0016);
     const wz = z + 90 * nWarpB.n2(x * 0.0016 + 31.7, z * 0.0016 - 17.3);
-    const cs0 = nCont.fbm2(wx * 0.0002, wz * 0.0002, Math.min(4, oct), 2.1, 0.5) * 1.8 + 0.14;
+    const cs0 = nCont.fbm2(wx * 0.0002, wz * 0.0002, Math.min(4, oct), 2.1, 0.5) * 1.8 + 0.14 + cBias;
     const cs = cs0 < -1 ? -1 : cs0 > 1 ? 1 : cs0;
     let h = spline(cs);
     // mountains
@@ -83,15 +111,15 @@ export function createTerrain(seed) {
     const mask = smooth(0.0, 0.4, mm) * smooth(-0.05, 0.28, cs);
     if (mask > 0.001) {
       const rid = nRidge.ridged2(wx * 0.0013, wz * 0.0013, Math.min(6, oct));
-      h += mask * (26 + 175 * Math.pow(rid, 1.2));
+      h += mask * (26 + 175 * Math.pow(rid, 1.2)) * mScale;
     }
     // climate (needed early: badlands reshape the terrain itself)
-    const temp0 = nTemp.fbm2(x * 0.00045 + 500, z * 0.00045 + 40, Math.min(2, oct)) * 1.9;
-    const hum = nHum.fbm2(x * 0.00055 - 800, z * 0.00055 + 700, Math.min(2, oct)) * 1.9;
+    const temp0 = nTemp.fbm2(x * 0.00045 + 500, z * 0.00045 + 40, Math.min(2, oct)) * 1.9 * cSpread + tBias;
+    const hum = nHum.fbm2(x * 0.00055 - 800, z * 0.00055 + 700, Math.min(2, oct)) * 1.9 * cSpread + hBias;
     // hills + detail
     const hillAmp = 3 + 13 * smooth(-0.2, 0.6, nHillAmp.n2(wx * 0.0011, wz * 0.0011));
     const landF = 0.35 + 0.65 * smooth(-0.12, 0.04, cs);
-    h += nHill.fbm2(wx * 0.0058, wz * 0.0058, Math.min(4, oct)) * hillAmp * landF * 1.5;
+    h += nHill.fbm2(wx * 0.0058, wz * 0.0058, Math.min(4, oct)) * hillAmp * landF * 1.5 * hScale;
     if (oct >= 3) h += nDet.fbm2(x * 0.026, z * 0.026, Math.min(2, oct - 1)) * 2.0 * landF * (1 - mask * 0.4);
     // badlands: hot + dry patches become stepped mesas (9-block tiers with sheer cliffs)
     const bm = smooth(0.16, 0.4, nBad.fbm2(x * 0.0007 + 900, z * 0.0007 - 300, Math.min(3, oct))) * smooth(0.2, 0.5, temp0) * (1 - smooth(-0.1, 0.3, hum));
@@ -104,13 +132,13 @@ export function createTerrain(seed) {
     // lakes
     const lk = smooth(0.34, 0.54, nLake.fbm2(wx * 0.0024, wz * 0.0024, Math.min(2, oct)));
     if (lk > 0) {
-      const lf = lk * smooth(-0.06, 0.1, cs) * (1 - smooth(70, 100, h));
+      const lf = Math.min(1, lk * smooth(-0.06, 0.1, cs) * (1 - smooth(70, 100, h)) * lScale);
       h += (56.5 - 5 * lk - h) * lf;
     }
     // rivers
     const rn = Math.abs(nRiver.fbm2(wx * 0.0012 + 55, wz * 0.0012 + 12, Math.min(2, oct)));
     if (rn < 0.2) {
-      const rw = smooth(-0.15, 0.0, cs) * smooth(-0.35, 0.15, nRivMask.n2(wx * 0.0004, wz * 0.0004)) * (1 - 0.7 * mask);
+      const rw = smooth(-0.15, 0.0, cs) * smooth(-0.35, 0.15, nRivMask.n2(wx * 0.0004, wz * 0.0004)) * (1 - 0.7 * mask) * rScale;
       if (rw > 0) {
         const f = smooth(0.012, 0.17, rn);
         const bed = SEA_LEVEL - 3.5;
@@ -125,7 +153,7 @@ export function createTerrain(seed) {
     const temp = temp0 - (h > 85 ? (h - 85) * 0.008 : 0);
     out.temp = temp; out.hum = hum;
     // snow cover
-    const snowLine = 118 + temp0 * 22 + (oct >= 3 ? nSnow.n2(x * 0.02, z * 0.02) * 6 : 0);
+    const snowLine = 118 + temp0 * 22 + (oct >= 3 ? nSnow.n2(x * 0.02, z * 0.02) * 6 : 0) + snowOff;
     out.snow = smooth(snowLine - 4, snowLine + 10, h);
     // biome
     let b;
@@ -162,6 +190,9 @@ export function createTerrain(seed) {
 
   return {
     seed,
+    profile: profile || null,
+    /** biome tint table for this planet (the global TINT_TABLE when profile is null) */
+    tint,
     columnInfo,
     /** float surface height (top of terrain, before water) */
     heightAt(x, z, octaves = 8) { return columnInfo(x, z, octaves, scratch).h; },

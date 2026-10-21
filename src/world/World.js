@@ -2,7 +2,8 @@
 import * as THREE from 'three';
 import { SEA_LEVEL, MAX_LOD, CHUNK_VOLUME } from '../shared/constants.js';
 import { B, LIQUID } from '../shared/blocks.js';
-import { createTerrain } from './terrain.js';
+import { createTerrain, setDefaultProfile } from './terrain.js';
+import { sanitizeProfile } from './profile.js';
 import { WorkerPool } from './WorkerPool.js';
 
 const FADE_MS = 450;
@@ -30,10 +31,11 @@ export class World {
    */
   constructor({ seed, scene, materials, quality, onProgress, events, profile }) {
     this.seed = seed | 0; this.materials = materials; this.onProgress = onProgress || null;
-    this.events = events || null; this.profile = profile || null;
+    this.events = events || null; this.profile = profile ? sanitizeProfile(profile) : null;   // never trust a profile that came over the network
+    setDefaultProfile(this.profile);
     this.group = new THREE.Group(); this.group.name = 'world';
     if (scene) scene.add(this.group);
-    this.terrain = createTerrain(this.seed);
+    this.terrain = createTerrain(this.seed, this.profile);
     this.nodes = new Map();
     this.loadedChunks = new Set();
     this.queue = []; this.urgent = []; this.vq = []; this.results = [];
@@ -378,9 +380,9 @@ export class World {
     if (node.L === 0) {
       const wantVox = !node.voxels && Math.max(Math.abs(node.tx - Math.floor(this.camX / 32)), Math.abs(node.tz - Math.floor(this.camZ / 32))) <= this.dataR + 1;
       node.ver++;
-      return this.pool.post({ type: 'chunk', id: node.key, cx: node.tx, cz: node.tz, seed: this.seed, ver: node.ver, edits: this._collectEdits(node.tx, node.tz), wantVoxels: wantVox, skipMesh: false, urgent: node.edit });
+      return this.pool.post({ type: 'chunk', id: node.key, cx: node.tx, cz: node.tz, seed: this.seed, profile: this.profile, ver: node.ver, edits: this._collectEdits(node.tx, node.tz), wantVoxels: wantVox, skipMesh: false, urgent: node.edit });
     }
-    return this.pool.post({ type: 'lod', id: node.key, L: node.L, tx: node.tx, tz: node.tz, seed: this.seed });
+    return this.pool.post({ type: 'lod', id: node.key, L: node.L, tx: node.tx, tz: node.tz, seed: this.seed, profile: this.profile });
   }
 
   _pump() {
@@ -390,7 +392,7 @@ export class World {
       if (node) { this._dispatch(node); node.edit = false; continue; }
       while (this.vq.length && !node) { const n = this.vq.shift(); if (!n.dead && !n.voxels) node = n; }
       if (node) {
-        this.pool.post({ type: 'chunk', id: node.key, cx: node.tx, cz: node.tz, seed: this.seed, ver: node.ver, edits: this._collectEdits(node.tx, node.tz), wantVoxels: true, skipMesh: true });
+        this.pool.post({ type: 'chunk', id: node.key, cx: node.tx, cz: node.tz, seed: this.seed, profile: this.profile, ver: node.ver, edits: this._collectEdits(node.tx, node.tz), wantVoxels: true, skipMesh: true });
         continue;
       }
       let guard = 0;

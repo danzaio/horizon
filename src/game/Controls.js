@@ -16,7 +16,7 @@ export class Controls {
     this.actions = {};
     /** features register hotkeys here: KeyboardEvent.code -> fn(event); only fire while gameplay input is active */
     this.extraKeys = new Map();
-    this._lastSpace = 0;
+    this._lastSpace = 0; this.noDoubleTapFly = false;   // items (jetpack) turn the double-tap-to-fly shortcut off
     this.dragMode = false; this._drag = null; this._lockAct = false; this.onDragMode = null;
     this._tj = { id: -1, cx: 0, cy: 0, fwd: 0, strafe: 0, sprint: false };
     this._tl = { id: -1, x: 0, y: 0 };
@@ -120,7 +120,7 @@ export class Controls {
       const a = this.actions;
       if (c === 'Space') {
         const now = performance.now();
-        if (now - this._lastSpace < 300) { this._toggleFly(); this._lastSpace = 0; } else this._lastSpace = now;
+        if (now - this._lastSpace < 300 && !(this.player.extraJumps > 0) && !this.noDoubleTapFly) { this._toggleFly(); this._lastSpace = 0; } else this._lastSpace = now;
       } else if (c === 'KeyF') this._toggleFly();
       else if (c === 'KeyE' && a.palette) a.palette();
       else if (c === 'F3' && a.debug) a.debug();
@@ -139,7 +139,9 @@ export class Controls {
   }
 
   _toggleFly() {
-    const p = this.player; p.flying = !p.flying;
+    const p = this.player;
+    if (p.flyMode === 'off' && !p.flying) return;     // fly disabled by the game mode / dome rules
+    p.flying = !p.flying;
     if (p.flying) p.vy = 0;
     if (this.actions.flyToggled) this.actions.flyToggled(p.flying);
   }

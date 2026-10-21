@@ -25,9 +25,19 @@ const VSTYLE = {
 const STRATA = [B.TERRACOTTA, B.TERRACOTTA, B.TERRACOTTA_YELLOW, B.TERRACOTTA_RED, B.TERRACOTTA, B.TERRACOTTA_WHITE, B.TERRACOTTA, B.TERRACOTTA_BROWN, B.TERRACOTTA, B.TERRACOTTA_YELLOW, B.TERRACOTTA, B.TERRACOTTA, B.TERRACOTTA_RED, B.TERRACOTTA_WHITE, B.TERRACOTTA, B.TERRACOTTA_BROWN];
 
 export class ChunkGen {
-  constructor(seed) {
+  /** @param {number} seed @param {object|null} [profile] PlanetProfile (null = the legacy world, bit-identical) */
+  constructor(seed, profile = null) {
     this.seed = seed | 0;
-    this.terrain = createTerrain(seed);
+    this.profile = profile || null;
+    this.terrain = createTerrain(seed, profile);
+    // --- planet rules (neutral values reproduce the legacy world exactly)
+    const pg = profile && profile.ground;
+    this.gTop = pg ? B[pg.top] : B.GRASS; this.gFill = pg ? B[pg.fill] : B.DIRT;
+    this.sandB = profile && profile.sand === 'red' ? B.RED_SAND : profile && profile.sand === 'gravel' ? B.GRAVEL : B.SAND;
+    this.treeMul = profile && profile.terrain ? profile.terrain.treeMul ?? 1 : 1;
+    this.caveScale = profile && profile.terrain ? profile.terrain.caveScale ?? 1 : 1;
+    this.oakOnly = !!(profile && profile.trees === 'oak');
+    this.villageMul = profile && profile.villages != null ? profile.villages : 1;
     this.vol = new Uint8Array(VOL_SIZE);
     this.hf = new Float32Array(PSY);
     this.sy = new Int16Array(PSY);
@@ -132,7 +142,7 @@ export class ChunkGen {
 
   surfaceColumn(col, wx, wz) {
     const vol = this.vol, s = this.sy[col], b = this.bio[col], slope = this.slope[col];
-    let top = B.GRASS, d1 = 1, fill = B.DIRT, d2 = 3 + (hash3(wx, 5, wz) & 1);
+    let top = this.gTop, d1 = 1, fill = this.gFill, d2 = 3 + (hash3(wx, 5, wz) & 1);
     if (s < SEA_LEVEL) {
       d2 = 0;
       if (b === BIOME.RIVER) { top = (hash3(wx >> 2, 3, wz >> 2) % 10) < 6 ? B.SAND : B.GRAVEL; d1 = 3; }
@@ -144,8 +154,8 @@ export class ChunkGen {
       if (b === BIOME.FROZEN) vol[col + (wy + 1) * PSY] = B.ICE;
     } else {
       switch (b) {
-        case BIOME.BEACH: top = B.SAND; d1 = 4; d2 = 0; break;
-        case BIOME.DESERT: top = B.SAND; d1 = 5; fill = B.SANDSTONE; d2 = 4; break;
+        case BIOME.BEACH: top = this.sandB; d1 = 4; d2 = 0; break;
+        case BIOME.DESERT: top = this.sandB; d1 = 5; fill = B.SANDSTONE; d2 = 4; break;
         case BIOME.BADLANDS: {
           // sheer mesa walls show coloured clay strata; flat tops are red sand
           const flat = slope < 1.2;
@@ -161,7 +171,7 @@ export class ChunkGen {
           break;
         case BIOME.STONY: {
           const r = hash3(wx >> 3, 6, wz >> 3) & 15;
-          if (slope < 0.7 && r < 7) { top = B.GRASS; d1 = 1; }
+          if (slope < 0.7 && r < 7) { top = this.gTop; d1 = 1; }
           else if (r < 9) { top = B.GRAVEL; d1 = 1; d2 = 0; }
           else { top = B.STONE; d1 = 0; d2 = 0; }
           break;
@@ -176,6 +186,7 @@ export class ChunkGen {
 
   carveCaves(cx, cz) {
     const { sy, limit, vol, cv, tv, nC } = this;
+    if (this.caveScale <= 0) return;
     let limMax = 0;
     for (let col = 0; col < PSY; col++) {
       const l = sy[col] <= SEA_LEVEL + 1 ? sy[col] - 8 : sy[col] - 2;
@@ -198,7 +209,7 @@ export class ChunkGen {
         }
       }
     }
-    const CT = 0.56, TT = 0.075;
+    const CT = 0.56 - (this.caveScale - 1) * 0.1, TT = 0.075 * this.caveScale;
     for (let m = 0; m < ny - 1; m++) {
       for (let kz = 0; kz < CAVE_N - 1; kz++) {
         for (let kx = 0; kx < CAVE_N - 1; kx++) {
@@ -259,7 +270,7 @@ export class ChunkGen {
           if (r < g) id = B.TALL_GRASS;
           else if (r < g + f) id = b === BIOME.CHERRY ? B.PINK_FLOWER : (r * 1000 | 0) & 1 ? B.FLOWER_RED : B.FLOWER_YELLOW;
         } else if (top === B.SNOW_GRASS) { if (r < 0.03) id = B.TALL_GRASS; }
-        else if (top === B.SAND && b === BIOME.DESERT) { if (r < 0.012) id = B.DEAD_BUSH; }
+        else if (top === this.sandB && b === BIOME.DESERT) { if (r < 0.012) id = B.DEAD_BUSH; }
         else if (top === B.RED_SAND) { if (r < 0.02) id = B.DEAD_BUSH; }
         if (id) vol[above] = id;
       }
@@ -300,7 +311,7 @@ export class ChunkGen {
     if (this.vcache.has(key)) return this.vcache.get(key);
     let site = null;
     const h = hash3(gx, gz, this.seed + 9191);
-    if ((h & 0xffff) / 65536 < 0.4) {
+    if ((h & 0xffff) / 65536 < 0.4 * this.villageMul) {
       const vx = gx * VCELL + 56 + (h >>> 16) % (VCELL - 112), vz = gz * VCELL + 56 + (hash3(gx, gz, this.seed + 9192) >>> 4) % (VCELL - 112);
       const T = this.terrain, info = this.info;
       T.columnInfo(vx, vz, 9, info);
@@ -479,15 +490,20 @@ export class ChunkGen {
         const h2 = hash3(tx, tz, 777);
         let dens = TREE_DENSITY[b];
         if (b === BIOME.DESERT || b === BIOME.BADLANDS) {
-          if (r < (b === BIOME.DESERT ? 0.035 : 0.014)) { const ch = 1 + (h2 & 3) % 3; for (let n = 1; n <= ch; n++) this.setB(tx, s + n, tz, B.CACTUS, 1); }
+          if (r < (b === BIOME.DESERT ? 0.035 : 0.014) * this.treeMul) { const ch = 1 + (h2 & 3) % 3; for (let n = 1; n <= ch; n++) this.setB(tx, s + n, tz, B.CACTUS, 1); }
           continue;
         }
         if (dens === 0) continue;
+        dens *= this.treeMul;
         if (b === BIOME.FOREST || b === BIOME.BIRCH || b === BIOME.TAIGA || b === BIOME.SWAMP || b === BIOME.CHERRY) {
           dens *= 0.3 + 1.4 * smooth(-0.4, 0.4, nz.n2(tx * 0.007, tz * 0.007));
         }
         if (r >= dens) continue;
         const base = s + 1;
+        if (this.oakOnly) {   // alien / jungle planets: every tree is an oak so the profile's foliage tint colours the whole canopy
+          if (((h2 >>> 12) & 7) === 0) this.bigOak(tx, base, tz, 7 + (h2 & 3), h2); else this.round(tx, base, tz, 4 + (h2 & 3), B.LOG_OAK, B.LEAVES_OAK, h2);
+          continue;
+        }
         switch (b) {
           case BIOME.TAIGA: case BIOME.SNOWY: case BIOME.STONY: this.spruce(tx, base, tz, 6 + (h2 & 7)); break;
           case BIOME.BIRCH: this.round(tx, base, tz, 5 + (h2 & 3), B.LOG_BIRCH, B.LEAVES_BIRCH, h2); break;

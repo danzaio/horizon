@@ -139,6 +139,15 @@ export const OUTPUT = /* glsl */`
 `;
 
 export const WATER_FN = /* glsl */`
+uniform vec4 uSeaGlow;   // planet sea emission: rgb = HDR linear colour, a = 0..1 strength (0 = ordinary water)
+// magma: slowly drifting dark crust plates over incandescent cracks
+vec3 seaGlowColor(vec2 wp, float tm){
+  float n = vnoise(wp * 0.11 + vec2(tm * 0.02, 0.0)) * 0.6 + vnoise(wp * 0.37 - vec2(0.0, tm * 0.03)) * 0.3 + vnoise(wp * 1.3 + tm * 0.05) * 0.1;
+  float crack = smoothstep(0.1, 0.0, abs(n - 0.5));
+  float crust = smoothstep(0.42, 0.62, n);
+  vec3 hot = uSeaGlow.rgb * (1.1 + 0.5 * vnoise(wp * 0.6 + tm * 0.2));
+  return mix(hot, vec3(0.05, 0.015, 0.01) + uSeaGlow.rgb * 0.12, crust * (1.0 - crack * 0.85));
+}
 // World-space wave normal (up-facing). detail 0..1 fades the high frequencies with distance. WATER_FX: 0 flat, 1 waves, 2 +noise octaves.
 vec3 waterNormal(vec3 rel, float detail){
   #if WATER_FX == 0
@@ -179,7 +188,9 @@ vec4 waterShade(vec3 rel, float depth01, float skyL, float detail, vec3 wtint){
     vec3 body0 = mix(vec3(0.10, 0.52, 0.55), vec3(0.012, 0.07, 0.19), smoothstep(0.0, 0.55, depth01)) * wtint;
     vec3 hz = mix(uHorizon, uZenith, 0.3) * uSkyP.y;
     float gl = clamp(1.0 - 1.4 * abs(normalize(rel).y), 0.0, 1.0);
-    return vec4(mix(body0 * lit0 + vec3(0.003, 0.012, 0.016), hz * 0.8, gl * gl * 0.55), 0.8);
+    vec4 r0 = vec4(mix(body0 * lit0 + vec3(0.003, 0.012, 0.016), hz * 0.8, gl * gl * 0.55), 0.8);
+    if (uSeaGlow.a > 0.0) { r0.rgb = mix(r0.rgb, seaGlowColor(rel.xz + uWorldOffset, uTime), uSeaGlow.a); r0.a = mix(r0.a, 1.0, uSeaGlow.a); }
+    return r0;
   #endif
   vec3 V = -normalize(rel);
   vec3 N = waterNormal(rel, detail);
@@ -207,6 +218,7 @@ vec4 waterShade(vec3 rel, float depth01, float skyL, float detail, vec3 wtint){
     col = mix(col, vec3(0.9, 0.95, 1.0) * (uAmbSky * 1.2 + 0.15), foam * 0.8);
     alpha = mix(alpha, 1.0, foam);
   #endif
+  if (uSeaGlow.a > 0.0) { col = mix(col, seaGlowColor(wp, tm), uSeaGlow.a); alpha = mix(alpha, 1.0, uSeaGlow.a); }
   return vec4(col, alpha);
 }
 
@@ -286,6 +298,7 @@ vec4 waterShadeSSR(vec3 mv, vec3 rel, float skyL, float detail, vec3 wtint){
   float foamN = vnoise(wp * 2.2 + uTime * 0.2) * 0.6 + vnoise(wp * 6.0 - uTime * 0.4) * 0.4;
   float foam = smoothstep(0.55, 0.0, L - foamN * 0.35) * smoothstep(0.3, 0.7, foamN) * detail * (1.0 - uFogP.z);
   col = mix(col, vec3(0.92, 0.96, 1.0) * (uAmbSky * 1.25 + 0.15), foam * 0.85);
+  if (uSeaGlow.a > 0.0) col = mix(col, seaGlowColor(wp, uTime), uSeaGlow.a);
   return vec4(col, 1.0);
 }
 #endif

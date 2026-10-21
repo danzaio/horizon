@@ -16,6 +16,16 @@ ${NOISE}
 ${SKY_FN}
 ${TONEMAP_FN}
 uniform mat3 uStarRot;
+// --- planet sky (neutral defaults reproduce the stock sky): second sun, up to 3 moons, star density, aurora colours
+uniform vec4 uSun2;        // xyz = direction of the second sun, w = disc scale (0 = single sun)
+uniform vec3 uSunCol;      // sun disc colour
+uniform vec3 uSun2Col;
+uniform vec4 uSkyL;        // x sun disc scale, y star threshold (0.9955 stock), z aurora strength, w stock-moon on/off
+uniform vec4 uMoons[3];    // xyz = direction, w = radius relative to the stock moon (0 = absent)
+uniform vec3 uMoonCols[3];
+uniform vec3 uAurA;
+uniform vec3 uAurB;
+uniform float uStarDay;    // airless worlds: stars/moons stay visible in daylight
 varying vec3 vDir;
 
 float cloudNoise(vec2 p){
@@ -94,7 +104,7 @@ vec3 aurora(vec3 d){
     float t = (900.0 + k * 1500.0) / max(d.y, 0.05);
     vec2 p = d.xz * t * 0.0011 + vec2(3.7, 1.3);
     float b = auroraBand(p) * (1.0 - k * 0.45);
-    acc += mix(vec3(0.08, 1.0, 0.42), vec3(0.62, 0.22, 0.95), k * k) * b;
+    acc += mix(uAurA, uAurB, k * k) * b;
   }
   return acc * smoothstep(0.03, 0.35, d.y) * (0.5 + 0.5 * vnoise(d.xz * 9.0 + uTime * 0.05));
 }
@@ -106,13 +116,23 @@ void main(){
   float up = d.y;
   // sun disc
   float sd = dot(d, uSunDir);
-  float disc = smoothstep(0.99935, 0.99965, sd);
-  col += vec3(1.0, 0.86, 0.62) * disc * 14.0 * uSkyP.w * step(-0.03, up) * (1.0 - 0.95 * uWeather.x);
+  float ss = uSkyL.x * uSkyL.x;
+  float disc = smoothstep(1.0 - 0.00065 * ss, 1.0 - 0.00035 * ss, sd);
+  col += uSunCol * disc * 14.0 * uSkyP.w * step(-0.03, up) * (1.0 - 0.95 * uWeather.x);
+  #ifndef SKY_CHEAP
+    if (uSun2.w > 0.0) {   // second sun: halo + disc, own rise/set
+      float s2 = dot(d, uSun2.xyz), up2 = smoothstep(-0.07, 0.05, uSun2.y);
+      float low2 = 1.0 - pow(clamp(up, 0.0, 1.0), 0.42);
+      col += uSun2Col * (pow(max(s2, 0.0), 5.0) * 0.18 + pow(max(s2, 0.0), 48.0) * 0.4 + pow(max(s2, 0.0), 700.0) * 1.2) * (0.55 + 1.6 * low2) * up2 * uSkyP.y * 0.6;
+      float sq = uSun2.w * uSun2.w;
+      col += uSun2Col * smoothstep(1.0 - 0.00065 * sq, 1.0 - 0.00035 * sq, s2) * 14.0 * up2 * step(-0.03, up) * (1.0 - 0.95 * uWeather.x);
+    }
+  #endif
   // moon + stars
   #if SKY_DETAIL >= 1
     float md = dot(d, uMoonDir);
-    float night = uSkyP.x;
-    if (md > 0.9985 && night > 0.01) {
+    float night = max(uSkyP.x, uStarDay);
+    if (uSkyL.w > 0.5 && md > 0.9985 && night > 0.01) {
       vec3 T = normalize(cross(uMoonDir, vec3(0.0, 1.0, 0.01))), Bt = cross(T, uMoonDir);
       vec2 mq = vec2(dot(d, T), dot(d, Bt)) / 0.0425;
       float r2 = dot(mq, mq);
@@ -123,12 +143,28 @@ void main(){
         col = mix(col, vec3(0.78, 0.83, 0.95) * cr * (0.06 + ph) * 2.2 * uSkyP.y, smoothstep(1.0, 0.92, r2) * night);
       }
     }
+    for (int mi = 0; mi < 3; mi++) {   // planet moons: size relative to the stock moon, tinted, lit by the sun, faintly visible by day
+      vec4 mo = uMoons[mi];
+      if (mo.w <= 0.0) continue;
+      float rr = mo.w * 0.0425;
+      if (dot(d, mo.xyz) < 1.0 - rr * rr * 0.85) continue;
+      vec3 T = normalize(cross(mo.xyz, vec3(0.0, 1.0, 0.01))), Bt = cross(T, mo.xyz);
+      vec2 mq = vec2(dot(d, T), dot(d, Bt)) / rr;
+      float r2 = dot(mq, mq);
+      if (r2 < 1.0) {
+        vec3 nn = T * mq.x + Bt * mq.y + mo.xyz * sqrt(1.0 - r2);
+        float ph = smoothstep(-0.15, 0.25, dot(nn, uSunDir));
+        float cr = 0.72 + 0.28 * vnoise(mq * 4.5 + float(mi) * 9.0) + 0.1 * vnoise(mq * 11.0);
+        float vis = mix(0.1, 1.0, night);
+        col = mix(col, uMoonCols[mi] * cr * (0.06 + ph) * 2.2 * uSkyP.y * vis, smoothstep(1.0, 0.92, r2) * (0.55 + 0.45 * night));
+      }
+    }
     if (night > 0.02 && up > -0.05) {
       vec3 sd3 = uStarRot * d;
       vec3 q = sd3 * 150.0, id = floor(q);
       float h = hash13(id);
       float tw = 0.65 + 0.35 * sin(uTime * (1.5 + h * 3.0) + h * 40.0);
-      float star = step(0.9955, h) * smoothstep(0.52, 0.05, length(fract(q) - 0.5)) * tw;
+      float star = step(uSkyL.y, h) * smoothstep(0.52, 0.05, length(fract(q) - 0.5)) * tw;
       vec3 sc = mix(vec3(0.8, 0.88, 1.0), vec3(1.0, 0.85, 0.65), hash13(id + 3.7));
       float band = exp(-pow(sd3.z * 3.2 + 0.25 * sin(sd3.x * 3.0), 2.0));
       float mw = band * (0.5 + 0.7 * vnoise(sd3.xy * 9.0 + sd3.z * 5.0)) * 0.05;
@@ -137,7 +173,7 @@ void main(){
     }
   #endif
   #if SKY_DETAIL >= 2
-    if (uSkyP.x > 0.5 && up > 0.03 && uWeather.x < 0.6) col += aurora(d) * 0.13 * smoothstep(-0.25, 0.75, -d.z - 0.15 * d.x) * smoothstep(0.5, 0.95, uSkyP.x) * (1.0 - uWeather.x) * uSkyP.y;
+    if (uSkyP.x > 0.5 && up > 0.03 && uWeather.x < 0.6) col += aurora(d) * 0.13 * smoothstep(-0.25, 0.75, -d.z - 0.15 * d.x) * smoothstep(0.5, 0.95, uSkyP.x) * (1.0 - uWeather.x) * uSkyP.y * uSkyL.z;
   #endif
   #if SKY_DETAIL >= 1
     if (uWeather.w > 0.01 && up > 0.0) {   // primary rainbow: 42 deg ring around the anti-solar point, red outside, violet inside

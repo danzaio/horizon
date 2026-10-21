@@ -1,7 +1,7 @@
 // Pooled block-break particles: one THREE.Points object (<= MAX live), tiny custom ShaderMaterial, CPU integrated, zero per-frame allocation.
 import * as THREE from 'three';
 
-const MAX = 64;
+const MAX = 192;
 const VERT = /* glsl */`
 attribute vec3 aColor; attribute float aLife;
 uniform float uPx; varying vec3 vColor; varying float vA;
@@ -34,15 +34,15 @@ export class Particles {
     this._ring = 0;
   }
 
-  /** Burst of `count` particles at world (x,y,z) with colour rgb (0..1). */
-  burst(x, y, z, rgb, count = 16) {
+  /** Burst of `count` particles at world (x,y,z) with colour rgb (0..1). `spd` scales the outward speed (explosions use > 1). */
+  burst(x, y, z, rgb, count = 16, spd = 1) {
     if (this.n === 0) this.points.position.set(Math.floor(x), Math.floor(y), Math.floor(z)); // local origin keeps float32 precise
     const o = this.points.position;
     for (let i = 0; i < count; i++) {
       const k = this.n < MAX ? this.n++ : (this._ring = (this._ring + 1) % MAX);
       const j = k * 3, v = 0.78 + Math.random() * 0.4;
       this.pos[j] = x - o.x + (Math.random() - 0.5) * 0.8; this.pos[j + 1] = y - o.y + (Math.random() - 0.5) * 0.8; this.pos[j + 2] = z - o.z + (Math.random() - 0.5) * 0.8;
-      this.vel[j] = (Math.random() - 0.5) * 3.2; this.vel[j + 1] = 1.5 + Math.random() * 3; this.vel[j + 2] = (Math.random() - 0.5) * 3.2;
+      this.vel[j] = (Math.random() - 0.5) * 3.2 * spd; this.vel[j + 1] = (1.5 + Math.random() * 3) * spd; this.vel[j + 2] = (Math.random() - 0.5) * 3.2 * spd;
       this.col[j] = rgb[0] * v; this.col[j + 1] = rgb[1] * v; this.col[j + 2] = rgb[2] * v;
       this.ttl[k] = 0.5 + Math.random() * 0.5; this.life[k] = 1;
     }

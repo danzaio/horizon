@@ -78,6 +78,7 @@ export class Mesher {
     this.solid = new Buf(8192);
     this.water = new Buf(2048);
     this.gen = null;
+    this.TT = TINT_TABLE;    // biome tint table of the current planet (set per chunk from gen.terrain.tint)
   }
 
   sky1(ci, y) {
@@ -106,7 +107,7 @@ export class Mesher {
    * @returns {{solid:object|null, water:object|null}}
    */
   mesh(gen) {
-    this.gen = gen;
+    this.gen = gen; this.TT = gen.terrain.tint || TINT_TABLE;
     this.solid.reset(); this.water.reset();
     this.solid.macro = true; this.solid.ox = gen.wx0 + 1; this.solid.oz = gen.wz0 + 1; this.water.macro = false;
     this.meshCubes();
@@ -200,7 +201,7 @@ export class Mesher {
     const layer = key & 127, ao = (key >> 7) & 255, light = (key >> 15) & 255, ti = (key >> 23) & 63;
     const a0 = ao & 3, a1 = (ao >> 2) & 3, a2 = (ao >> 4) & 3, a3 = (ao >> 6) & 3;
     const fl = LAYER_FLAGS[layer];
-    const tr = ti ? TINT_TABLE[ti * 3] : 255, tg = ti ? TINT_TABLE[ti * 3 + 1] : 255, tb = ti ? TINT_TABLE[ti * 3 + 2] : 255;
+    const tr = ti ? this.TT[ti * 3] : 255, tg = ti ? this.TT[ti * 3 + 1] : 255, tb = ti ? this.TT[ti * 3 + 2] : 255;
     const sPos = ((f & 1) ? s : s + 1) * 16;
     const u0 = u * 16, u1 = (u + w) * 16, v0 = v * 16, v1 = (v + h) * 16;
     for (let k = 0; k < 4; k++) {
@@ -228,7 +229,7 @@ export class Mesher {
           const layer = TILE_FACE[b * 6];
           const light = (this.skyAt(col, y) << 4) | (hasBL ? bl[pi] : 0);
           const tt = TINT[b], ti = tt ? bio[col] * 4 + tt : 0;
-          const tr = ti ? TINT_TABLE[ti * 3] : 255, tg = ti ? TINT_TABLE[ti * 3 + 1] : 255, tb = ti ? TINT_TABLE[ti * 3 + 2] : 255;
+          const tr = ti ? this.TT[ti * 3] : 255, tg = ti ? this.TT[ti * 3 + 1] : 255, tb = ti ? this.TT[ti * 3 + 2] : 255;
           const m0 = 6 | 3 << META_AO_SHIFT | LAYER_FLAGS[layer];
           const X = x * 16, Y = y * 16, Z = z * 16;
           for (let d = 0; d < 2; d++) {
@@ -299,7 +300,7 @@ export class Mesher {
           for (let hh = 0; hh < h; hh++) { const row = mi + hh * 32; for (let ww = 0; ww < w; ww++) mask[row + ww] = 0; }
           buf.ensure(4);
           const dq = key & 31, sky = (key >> 5) & 15, ti = (key >> 13) & 63;
-          const light = sky << 4, tr = TINT_TABLE[ti * 3], tg = TINT_TABLE[ti * 3 + 1], tb = TINT_TABLE[ti * 3 + 2];
+          const light = sky << 4, tr = this.TT[ti * 3], tg = this.TT[ti * 3 + 1], tb = this.TT[ti * 3 + 2];
           const ta = Math.round(Math.min(dq, 16) / 16 * 255);
           const yy = y * 16 + 14, m0 = 2 | 3 << META_AO_SHIFT;
           const x0 = x * 16, x1 = (x + w) * 16, z0 = z * 16, z1 = (z + h) * 16;
@@ -316,7 +317,7 @@ export class Mesher {
   /** single water side quad (face f), top at topSixteenths within the block */
   waterSide(f, x, y, z, top16, ti, light) {
     const buf = this.water; buf.ensure(4);
-    const tr = TINT_TABLE[ti * 3], tg = TINT_TABLE[ti * 3 + 1], tb = TINT_TABLE[ti * 3 + 2];
+    const tr = this.TT[ti * 3], tg = this.TT[ti * 3 + 1], tb = this.TT[ti * 3 + 2];
     const m0 = f | 3 << META_AO_SHIFT, X = x * 16, Y = y * 16, Z = z * 16;
     const yt = f === 3 ? Y : Y + top16;
     if (f === 0 || f === 1) {

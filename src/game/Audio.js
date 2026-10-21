@@ -59,6 +59,72 @@ export class GameAudio {
   blockPlace(id) { this._surfaceBurst(id, 1.1, 0.1); }
   splash(speed) { this._burst({ freq: 1800, q: 0.7, type: 'bandpass', dur: 0.4, gain: Math.min(0.6, 0.15 + speed / 25), attack: 0.02, detune: 0.3 }); }
 
+  // --- items / combat (G): everything is synthesized from noise bursts and short oscillator sweeps ---
+  /** Pitched sweep: oscillator f0 -> f1 over `dur`, optional lowpass; `delay` seconds from now. */
+  _tone({ type = 'sine', f0 = 440, f1 = f0, dur = 0.15, gain = 0.2, delay = 0, lp = 0, attack = 0.005 }) {
+    const c = this.ctx; if (!c || this.muted || this.volume <= 0) return;
+    const t = c.currentTime + delay, o = c.createOscillator(), g = c.createGain();
+    o.type = type; o.frequency.setValueAtTime(f0, t); if (f1 !== f0) o.frequency.exponentialRampToValueAtTime(Math.max(1, f1), t + dur);
+    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(gain, t + attack); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    let out = o;
+    if (lp) { const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = lp; o.connect(f); out = f; }
+    out.connect(g); g.connect(this.master); o.start(t); o.stop(t + dur + 0.03);
+  }
+  swing(heavy = false) { this._burst({ freq: heavy ? 900 : 1500, q: 1.1, type: 'bandpass', dur: heavy ? 0.22 : 0.15, gain: 0.26, attack: 0.04, detune: 0.3 }); }
+  hit(heavy = false) { this._burst({ freq: 700, q: 1.5, type: 'bandpass', dur: 0.1, gain: heavy ? 0.5 : 0.36, tone: heavy ? 110 : 160 }); }
+  hurt() { this._tone({ type: 'sawtooth', f0: 230, f1: 110, dur: 0.2, gain: 0.2, lp: 900 }); this._burst({ freq: 500, dur: 0.1, gain: 0.25 }); }
+  death() { this._tone({ type: 'sawtooth', f0: 320, f1: 50, dur: 0.9, gain: 0.22, lp: 700 }); }
+  respawn() { this._tone({ f0: 330, f1: 660, dur: 0.25, gain: 0.14 }); this._tone({ f0: 495, f1: 990, dur: 0.3, gain: 0.12, delay: 0.1 }); }
+  bowShoot(power = 1) { this._tone({ type: 'triangle', f0: 190 + 90 * power, f1: 70, dur: 0.16, gain: 0.3 }); this._burst({ freq: 2600, q: 0.8, type: 'bandpass', dur: 0.09, gain: 0.2 * power }); }
+  bowDraw() { this._burst({ freq: 420, q: 4, type: 'bandpass', dur: 0.12, gain: 0.08, attack: 0.03 }); }
+  arrowHit(id) { this._surfaceBurst(id || 1, 1.1, 0.07); this._tone({ f0: 320, f1: 160, dur: 0.07, gain: 0.12 }); }
+  fuse() { this._burst({ freq: 3800, q: 0.5, type: 'highpass', dur: 1.1, gain: 0.14, attack: 0.05 }); }
+  explosion(power = 4, dist = 0) {
+    const v = Math.max(0, 1 - dist / (40 + power * 6)); if (v < 0.03) return;
+    this._burst({ freq: 1200, q: 0.6, type: 'bandpass', dur: 0.3, gain: 0.55 * v, attack: 0.002 });
+    this._burst({ freq: 260, q: 0.7, type: 'lowpass', dur: 1.1 + power * 0.12, gain: 0.95 * v, attack: 0.01 });
+    this._burst({ freq: 110, q: 0.7, type: 'lowpass', dur: 1.8 + power * 0.15, gain: 0.8 * v, attack: 0.04 });
+    this._tone({ f0: 90, f1: 28, dur: 0.9, gain: 0.5 * v });
+  }
+  // PvP weapons / movement (synthesised, no assets)
+  gun(kind = 'rifle') {
+    if (kind === 'shotgun') { this._burst({ freq: 700, q: 0.7, type: 'lowpass', dur: 0.28, gain: 0.5 }); this._tone({ type: 'triangle', f0: 150, f1: 45, dur: 0.22, gain: 0.35 }); }
+    else if (kind === 'rail') { this._tone({ type: 'sawtooth', f0: 2400, f1: 90, dur: 0.45, gain: 0.22, lp: 5000 }); this._burst({ freq: 4200, q: 1.5, type: 'bandpass', dur: 0.25, gain: 0.3 }); }
+    else if (kind === 'rocket') { this._burst({ freq: 380, q: 0.8, type: 'lowpass', dur: 0.4, gain: 0.45 }); this._tone({ type: 'sawtooth', f0: 220, f1: 60, dur: 0.35, gain: 0.25, lp: 1200 }); }
+    else { this._burst({ freq: 3200, q: 0.9, type: 'bandpass', dur: 0.07, gain: 0.34 }); this._tone({ type: 'square', f0: 260, f1: 90, dur: 0.06, gain: 0.14, lp: 2000 }); }
+  }
+  dash() { this._burst({ freq: 1100, q: 0.9, type: 'bandpass', dur: 0.24, gain: 0.34, attack: 0.02 }); this._tone({ type: 'sine', f0: 300, f1: 760, dur: 0.14, gain: 0.1 }); }
+  wallJump() { this._burst({ freq: 800, q: 1.2, type: 'bandpass', dur: 0.12, gain: 0.26 }); this._tone({ f0: 420, f1: 640, dur: 0.1, gain: 0.1 }); }
+  slam() { this._tone({ type: 'sine', f0: 120, f1: 30, dur: 0.5, gain: 0.5 }); this._burst({ freq: 260, q: 0.7, type: 'lowpass', dur: 0.4, gain: 0.5 }); }
+  beep(hi = false) { this._tone({ type: 'square', f0: hi ? 1500 : 900, f1: hi ? 1500 : 900, dur: 0.06, gain: 0.1, lp: 3000 }); }
+  hitmark(kill = false) { this._tone({ f0: kill ? 1200 : 1800, f1: kill ? 700 : 1500, dur: 0.07, gain: 0.12 }); }
+
+  gravPick() { this._tone({ type: 'sawtooth', f0: 220, f1: 520, dur: 0.22, gain: 0.14, lp: 1400 }); }
+  gravDrop() { this._tone({ type: 'sawtooth', f0: 420, f1: 150, dur: 0.2, gain: 0.12, lp: 1200 }); }
+  gravThrow() { this._tone({ type: 'sawtooth', f0: 520, f1: 90, dur: 0.28, gain: 0.2, lp: 1600 }); this._burst({ freq: 500, dur: 0.2, gain: 0.3 }); }
+  grappleShoot() { this._tone({ type: 'square', f0: 1400, f1: 300, dur: 0.12, gain: 0.1, lp: 3000 }); this._burst({ freq: 3000, q: 1, type: 'bandpass', dur: 0.08, gain: 0.2 }); }
+  grappleHit() { this._tone({ type: 'square', f0: 900, f1: 600, dur: 0.06, gain: 0.12, lp: 2400 }); }
+  snowThrow() { this._burst({ freq: 900, q: 0.7, type: 'bandpass', dur: 0.1, gain: 0.2, attack: 0.02 }); }
+  snowHit() { this._burst({ freq: 3000, type: 'highpass', dur: 0.09, gain: 0.25 }); this._tone({ f0: 200, f1: 120, dur: 0.06, gain: 0.08 }); }
+  wand() { [880, 1320, 1760, 2200].forEach((f, i) => this._tone({ f0: f, f1: f * 1.02, dur: 0.22, gain: 0.08, delay: i * 0.06 })); }
+  pickup() { this._tone({ f0: 620, f1: 980, dur: 0.1, gain: 0.12 }); }
+  equip() { this._burst({ freq: 2200, q: 2, type: 'bandpass', dur: 0.04, gain: 0.1 }); }
+  rocket() { this._burst({ freq: 3000, q: 0.5, type: 'highpass', dur: 0.9, gain: 0.18, attack: 0.04 }); }
+  teleport() { this._tone({ f0: 1200, f1: 200, dur: 0.3, gain: 0.14 }); this._tone({ f0: 200, f1: 900, dur: 0.25, gain: 0.1, delay: 0.1 }); }
+  /** Continuous jetpack roar, level 0..1 (0 = off). Created on first use. */
+  jet(level) {
+    const c = this.ctx; if (!c) return;
+    if (!this._jet) {
+      if (level <= 0) return;
+      const s = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain();
+      s.buffer = this.noise; s.loop = true; f.type = 'bandpass'; f.frequency.value = 700; f.Q.value = 0.7; g.gain.value = 0; s.connect(f); f.connect(g); g.connect(this.master); s.start();
+      this._jet = { f, g };
+    }
+    const now = c.currentTime;
+    this._jet.g.gain.setTargetAtTime(this.muted ? 0 : 0.2 * level, now, 0.06);
+    this._jet.f.frequency.setTargetAtTime(500 + 500 * level, now, 0.1);
+  }
+
   _startAmbient() {
     const c = this.ctx;
     const mk = (type, freq, q) => { const s = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain(); s.buffer = this.noise; s.loop = true; f.type = type; f.frequency.value = freq; f.Q.value = q; g.gain.value = 0; s.connect(f); f.connect(g); g.connect(this.master); s.start(); return { f, g }; };

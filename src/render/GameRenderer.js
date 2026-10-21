@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { getPreset } from '../shared/quality.js';
-import { TimeOfDay } from './TimeOfDay.js';
+import { TimeOfDay, lookFromSky } from './TimeOfDay.js';
 import { Sky } from './Sky.js';
 import { createBlockTextureArray } from './textures.js';
 import { createMaterials, updateMaterialQuality } from './materials.js';
@@ -34,7 +34,12 @@ export class GameRenderer {
       uCloudP: U(new THREE.Vector4(0.5, 380, 0, 0)), uHeld: U(new THREE.Vector4(0, 0, 0, 0)), uWeather: U(new THREE.Vector4(0, 0, 0, 0)), uFade: U(1),
       tSceneColor: U(null), tSceneDepth: U(null), uProjP: U(new THREE.Vector4(1, 1, 0.3, 24000)), uInvRes: U(new THREE.Vector2(1, 1)),
       uShadowMap: U(null), uShadowMatrix: U(new THREE.Matrix4()), uShadowP: U(new THREE.Vector4(0.15, 1 / 2048, 1, 0)),
+      // planet look (neutral = stock sky; driven by setPlanetLook)
+      uSun2: U(t.sun2Dir), uSunCol: U(new THREE.Vector3(1.0, 0.86, 0.62)), uSun2Col: U(new THREE.Vector3(0.6, 0.75, 1.0)), uSkyL: U(new THREE.Vector4(1, 0.9955, 1, 1)),
+      uMoons: U(t.moonA), uMoonCols: U([new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()]), uAurA: U(new THREE.Vector3(0.08, 1.0, 0.42)), uAurB: U(new THREE.Vector3(0.62, 0.22, 0.95)),
+      uStarDay: U(0), uSeaGlow: U(new THREE.Vector4(0, 0, 0, 0)), uWTClamp: U(new THREE.Vector2(0.55, 1.4)),
     };
+    this._fogMul = 1; this._cloudBase = 0.5; this._dayK = 1;
     this.tiles = createBlockTextureArray();
     this.hand = new Hand(this.shared, this.tiles);   // first-person held block (parented to the camera)
     this.camera.add(this.hand.root); this.scene.add(this.camera);
@@ -65,7 +70,7 @@ export class GameRenderer {
     this.quality = q;
     const postOn = !!(q.post && q.post.on && this.floatOK);
     const shadowsOn = !!(q.shadows && q.shadows.on);
-    this.shared.uFogP.value.x = 1 / (q.viewDistance * 0.92);
+    this.shared.uFogP.value.x = this._fogMul / (q.viewDistance * 0.92);
     this.shared.uWind.value.x = q.wind ? 1 : 0;
     if (shadowsOn) { if (!this.shadow) this.shadow = new ShadowPass(this.shared, this.materials.solid.uniforms.uTiles); this.shadow.setQuality(q.shadows); }
     else if (this.shadow) { this.shadow.dispose(); this.shadow = null; this.shared.uShadowMap.value = null; }
@@ -77,6 +82,37 @@ export class GameRenderer {
     this.precip.setPost(postOn); this.precip.setCount(q.precip || 0); this.mobs.setPost(postOn);
     this.sky.setQuality(q, !postOn);
     this.setRenderScale(q.renderScale, this._appliedScale < 0);
+  }
+
+  /**
+   * Planet look (PlanetProfile, see docs/PLANETS.md): sky gradient + dusk colours, sun colour/size/count, up to 3 moons, star density, aurora, cloud cover,
+   * fog density, water tint, sea glow and day length. `null` restores the stock look. Cheap to call; safe before or after setQuality.
+   * @param {object|null} profile
+   */
+  setPlanetLook(profile) {
+    const sh = this.shared, t = this.time, sky = profile && profile.sky;
+    this.hand.setPlanetTint(profile && profile.palette);
+    const k = sky && profile.dayLength ? 20 / profile.dayLength : 1;
+    t.speed = t.speed / this._dayK * k; this._dayK = k;
+    this._fogMul = sky ? sky.fog : 1; this._cloudBase = sky ? 1 - sky.cloud : 0.5;
+    sh.uFogP.value.x = this._fogMul / (this.quality.viewDistance * 0.92);
+    const sw = sh.uSeaGlow.value, wc = sh.uWTClamp.value, sc = sh.uSunCol.value, s2 = sh.uSun2Col.value, L = sh.uSkyL.value;
+    if (!sky) {
+      t.setLook(null); sc.set(1.0, 0.86, 0.62); s2.set(0.6, 0.75, 1.0); L.set(1, 0.9955, 1, 1); sw.set(0, 0, 0, 0); wc.set(0.55, 1.4);
+      sh.uAurA.value.set(0.08, 1.0, 0.42); sh.uAurB.value.set(0.62, 0.22, 0.95); sh.uStarDay.value = 0; return;
+    }
+    const look = lookFromSky(sky, profile.palette && profile.palette.water);
+    look.sun2 = sky.sunCount === 2 ? Math.max(0.5, sky.sunScale * 0.8) : 0;
+    look.moons = sky.moons;
+    t.setLook(look);
+    sc.fromArray(sky.sun); if (sky.sun2) s2.fromArray(sky.sun2);
+    L.set(sky.sunScale, 1 - 0.0045 * sky.stars, sky.aurora, 0);
+    sh.uStarDay.value = profile.type === 'barren' ? 0.85 : 0;
+    for (let i = 0; i < 3; i++) { const m = sky.moons[i]; if (m) sh.uMoonCols.value[i].fromArray(m.color); }
+    const ap = profile.type === 'alien' ? [[0.2, 1.0, 0.8], [0.9, 0.25, 0.95]] : profile.type === 'frozen' ? [[0.2, 1.0, 0.55], [0.35, 0.5, 1.0]] : [[0.08, 1.0, 0.42], [0.62, 0.22, 0.95]];
+    sh.uAurA.value.fromArray(ap[0]); sh.uAurB.value.fromArray(ap[1]);
+    wc.set(0.25, 2.5);
+    if (profile.seaGlow) { const w = profile.palette.water; sw.set(w[0] / 255 * 1.6, w[1] / 255 * 0.9, w[2] / 255 * 0.5, Math.min(1, profile.seaGlow) * 0.92); } else sw.set(0, 0, 0, 0);
   }
 
   /** @param {number} s multiplier on min(devicePixelRatio,2) */
@@ -154,7 +190,7 @@ export class GameRenderer {
     this._under += (this._underTarget - this._under) * Math.min(1, dt * 10);
     if (Math.abs(this._under - this._underTarget) < 0.01) this._under = this._underTarget;
     sh.uFogP.value.z = this._under; sh.uFogP.value.w = cam.y;
-    sh.uCloudP.value.x = 0.5 + 0.05 * Math.sin(sh.uTime.value * 0.01);
+    sh.uCloudP.value.x = this._cloudBase + 0.05 * Math.sin(sh.uTime.value * 0.01);
     { const hh = t.hours; sh.uCloudP.value.z = Math.exp(-(((hh - 6.4) / 1.05) ** 2)) + 0.45 * Math.exp(-(((hh - 19.7) / 0.9) ** 2)); }   // dawn mist pooling in valleys, soft evening haze
     if (dt > 0) this._fps += (1 / dt - this._fps) * 0.05;
     if (this.post) this.post.setUnderwater(this._under);

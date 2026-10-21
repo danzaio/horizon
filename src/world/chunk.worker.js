@@ -3,10 +3,12 @@ import { ChunkGen } from './chunkGen.js';
 import { Mesher } from './mesher.js';
 import { LodMesher } from './lodMesher.js';
 
-let seed = null, gen = null, mesher = null, lod = null;
-function ensure(s) {
-  if (s === seed) return;
-  seed = s; gen = new ChunkGen(s); mesher = mesher || new Mesher(); lod = new LodMesher(gen.terrain);
+let seed = null, gen = null, mesher = null, lod = null, profKey = '';
+/** planet profile arrives as JSON (null = legacy world); the generator is rebuilt only when seed or profile change */
+function ensure(s, profile) {
+  const pk = profile ? JSON.stringify(profile) : '';
+  if (s === seed && pk === profKey) return;
+  seed = s; profKey = pk; gen = new ChunkGen(s, profile || null); mesher = mesher || new Mesher(); lod = new LodMesher(gen.terrain);
 }
 function collect(part, list) {
   if (!part) return;
@@ -21,7 +23,7 @@ self.onmessage = (e) => {
 };
 
 function handle(m) {
-  ensure(m.seed);
+  ensure(m.seed, m.profile);
   const t0 = performance.now();
   const tr = [];
   if (m.type === 'chunk') {

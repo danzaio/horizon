@@ -43,6 +43,21 @@ export class LodMesher {
   /** @param {ReturnType<import('./terrain.js').createTerrain>} terrain */
   constructor(terrain) {
     this.terrain = terrain;
+    // --- planet look (all neutral for profile === null: same constants and tables as the legacy world)
+    const prof = terrain.profile || null;
+    this.TT = terrain.tint || TINT_TABLE;
+    this.treeMul = prof && prof.terrain ? prof.terrain.treeMul ?? 1 : 1;
+    this.gLod = prof && prof.ground ? prof.ground.lod : null;
+    const sandKind = prof ? prof.sand : null;
+    this.sandTop = sandKind === 'red' ? [190, 108, 60] : sandKind === 'gravel' ? [118, 114, 112] : [226, 204, 146];
+    this.sandBeach = sandKind === 'red' ? [200, 124, 74] : sandKind === 'gravel' ? [124, 120, 118] : [222, 208, 160];
+    this.sandWall = sandKind === 'red' ? [176, 98, 54] : sandKind === 'gravel' ? [104, 100, 98] : [214, 196, 140];
+    this.leaf = LEAF;
+    if (prof) {   // oak canopies take the planet's foliage tint (untinted birch / spruce / cherry keep their texture colours)
+      const L2 = Object.assign({}, LEAF), oak = prof.trees === 'oak' ? Object.keys(LEAF).map(Number) : [BIOME.FOREST, BIOME.PLAINS, BIOME.SAVANNA, BIOME.SWAMP];
+      for (const b of oak) L2[b] = [this.TT[(b * 4 + 2) * 3] * 0.84, this.TT[(b * 4 + 2) * 3 + 1] * 0.84, this.TT[(b * 4 + 2) * 3 + 2] * 0.84];
+      this.leaf = L2;
+    }
     this.info = { h: 0, biome: 0, temp: 0, hum: 0, mask: 0, river: 1, snow: 0 };
     const N = G * G;
     this.H = new Int16Array(N); this.sy = new Int16Array(N); this.R = new Uint8Array(N); this.Gc = new Uint8Array(N); this.Bc = new Uint8Array(N);
@@ -61,7 +76,7 @@ export class LodMesher {
     const T = this.terrain, info = this.info, oct = OCT[L] || 1;
     const { H, sy, R, Gc, Bc, WR, WG, WB, FL, HS, BI, WD } = this;
     const bias = Math.min(6, 0.25 * c);
-    const nz = T.noise2, seedT = T.seed;
+    const nz = T.noise2, seedT = T.seed, TT = this.TT, tm = this.treeMul;
     // ---- pass 1: sample 34x34 grid (1-cell border): float height, biome, snow
     const { HF, SN } = this;
     for (let cj = -1; cj <= 32; cj++) {
@@ -102,7 +117,7 @@ export class LodMesher {
         const hs = hash3(tx * 32 + ci, L, tz * 32 + cj) & 255; HS[k] = hs;
         let fl = 0, r, g, bl;
         const wt = (b * 4 + 3) * 3;
-        WR[k] = TINT_TABLE[wt]; WG[k] = TINT_TABLE[wt + 1]; WB[k] = TINT_TABLE[wt + 2];
+        WR[k] = TT[wt]; WG[k] = TT[wt + 1]; WB[k] = TT[wt + 2];
         let plane;
         if (s < SEA_LEVEL) {
           fl = LODF_WATER;
@@ -112,30 +127,31 @@ export class LodMesher {
           WD[k] = 0;
           const gi = (b * 4 + 1) * 3;
           switch (b) {
-            case BIOME.BEACH: r = 222; g = 208; bl = 160; fl |= LODF_SAND; break;
+            case BIOME.BEACH: r = this.sandBeach[0]; g = this.sandBeach[1]; bl = this.sandBeach[2]; fl |= LODF_SAND; break;
             case BIOME.BADLANDS: { const q = BAND[(s + 3 * (hash3(0, s >> 3, 31) & 3)) & 15]; r = q[0]; g = q[1]; bl = q[2]; if (s > SEA_LEVEL + 20) fl |= LODF_CLIFF; break; }
-            case BIOME.DESERT: r = 226; g = 204; bl = 146; fl |= LODF_SAND; break;
+            case BIOME.DESERT: r = this.sandTop[0]; g = this.sandTop[1]; bl = this.sandTop[2]; fl |= LODF_SAND; break;
             case BIOME.SNOWY: r = 238; g = 244; bl = 250; fl |= LODF_SNOW; break;
             case BIOME.TAIGA: r = 214; g = 230; bl = 226; fl |= LODF_SNOW; break;
             case BIOME.PEAKS:
               if (SN[k] > 0.7) { r = 244; g = 248; bl = 252; fl |= LODF_SNOW; } else { r = ROCK[0]; g = ROCK[1]; bl = ROCK[2]; fl |= LODF_CLIFF; }
               break;
             case BIOME.STONY:
-              if ((hs & 15) < 6) { r = TINT_TABLE[gi] * 0.8; g = TINT_TABLE[gi + 1] * 0.8; bl = TINT_TABLE[gi + 2] * 0.8; } else { r = ROCK[0]; g = ROCK[1]; bl = ROCK[2]; fl |= LODF_CLIFF; }
+              if ((hs & 15) < 6) { r = TT[gi] * 0.8; g = TT[gi + 1] * 0.8; bl = TT[gi + 2] * 0.8; } else { r = ROCK[0]; g = ROCK[1]; bl = ROCK[2]; fl |= LODF_CLIFF; }
               break;
             default: {   // grass-like: same macro variation the chunk meshes apply to their tint
               const f = 1 + (macroNoise(wx, wz) - 0.5) * 0.24, hue = (macroNoise(wx + 91, wz - 53) - 0.5) * 0.12;
-              r = Math.min(255, TINT_TABLE[gi] * 0.82 * (f - hue)); g = Math.min(255, TINT_TABLE[gi + 1] * 0.82 * f); bl = Math.min(255, TINT_TABLE[gi + 2] * 0.82 * (f + hue * 0.7));
+              if (this.gLod) { const gl = this.gLod; r = Math.min(255, gl[0] * (f - hue)); g = Math.min(255, gl[1] * f); bl = Math.min(255, gl[2] * (f + hue * 0.7)); }   // planet ground cover (gravel / rock instead of grass)
+              else { r = Math.min(255, TT[gi] * 0.82 * (f - hue)); g = Math.min(255, TT[gi + 1] * 0.82 * f); bl = Math.min(255, TT[gi + 2] * 0.82 * (f + hue * 0.7)); }
             }
           }
           plane = s + 1 - bias;
           // forest canopy: per-cell random trees at fine levels; smooth raise + colour blend at coarse levels (no 'skyscraper' columns)
-          const dens = TREE_DENSITY[b];
+          const dens = TREE_DENSITY[b] * tm;
           if (dens > 0) {
             let cover = dens * 1.6;
             if (b === BIOME.FOREST || b === BIOME.BIRCH || b === BIOME.TAIGA || b === BIOME.SWAMP || b === BIOME.CHERRY) cover *= 0.3 + 1.4 * smooth(-0.4, 0.4, nz.n2(wx * 0.007, wz * 0.007));
             if (cover > 0.9) cover = 0.9;
-            const lc = LEAF[b] || LEAF[BIOME.FOREST], th = TREE_H[b] || 5;
+            const lc = this.leaf[b] || this.leaf[BIOME.FOREST], th = TREE_H[b] || 5;
             if (L <= 2) {
               // same deterministic 4x4 tree grid as chunkGen -> canopies line up with the real trees
               const gx0 = Math.floor(wx / 4), gz0 = Math.floor(wz / 4);
@@ -296,7 +312,7 @@ export class LodMesher {
     let r = this.R[k], g = this.Gc[k], b = this.Bc[k];
     const fl = this.FL[k];
     if (!(fl & LODF_CANOPY)) {
-      if (fl & LODF_SAND) { r = 214; g = 196; b = 140; }
+      if (fl & LODF_SAND) { r = this.sandWall[0]; g = this.sandWall[1]; b = this.sandWall[2]; }
       else if (fl & LODF_SNOW && drop < cs * 2) { r = 226; g = 232; b = 240; }
       else if (!(fl & LODF_CLIFF)) {
         if (drop >= 3 * cs) { r = ROCK[0]; g = ROCK[1]; b = ROCK[2]; } else { r = 120; g = 92; b = 66; }

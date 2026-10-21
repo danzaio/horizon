@@ -10,6 +10,7 @@ const BLOCK_PT = { stone: 'Pedra', dirt: 'Terra', grass: 'Grama', sand: 'Areia',
   cactus: 'Cacto', coal_ore: 'Carvão', iron_ore: 'Minério de ferro', gold_ore: 'Minério de ouro', diamond_ore: 'Diamante', planks: 'Tábuas', cobblestone: 'Pedregulho', glass: 'Vidro',
   glowstone: 'Pedra luminosa', tall_grass: 'Grama alta', red_flower: 'Flor vermelha', yellow_flower: 'Flor amarela', bricks: 'Tijolos', cherry_log: 'Tronco de cerejeira', cherry_leaves: 'Folhas de cerejeira', red_sand: 'Areia vermelha', terracotta: 'Terracota', yellow_terracotta: 'Terracota amarela', red_terracotta: 'Terracota vermelha', white_terracotta: 'Terracota branca', brown_terracotta: 'Terracota marrom', pink_flower: 'Flor rosa', seagrass: 'Capim-marinho', kelp: 'Alga kelp', pink_coral: 'Coral rosa', purple_coral: 'Coral roxo', red_coral: 'Coral vermelho', yellow_coral: 'Coral amarelo', torch: 'Tocha', hay: 'Fardo de feno', dirt_path: 'Caminho de terra', water: 'Água', lava: 'Lava', bedrock: 'Rocha base', air: 'Ar' };
 export const blockLabel = (id) => BLOCK_PT[blockName(id)] || blockName(id);
+BLOCK_PT.tnt = 'TNT';
 const TIPS = ['Dica: toque duas vezes em Espaço para voar; Shift acelera o voo.', 'Dica: o botão do meio do mouse copia o bloco que você está mirando.',
   'Dica: a qualidade Automática ajusta a resolução para manter a fluidez.', 'Dica: use a roda do mouse com Shift para mudar a velocidade do voo.',
   'Dica: pressione T para avançar o tempo — veja o pôr do sol de longe.', 'Dica: F3 mostra desempenho, chunks, LOD e coordenadas.'];
@@ -25,6 +26,10 @@ export class UI {
     this.frames = new Float32Array(120); this.fi = 0;
     this._dbgT = 0; this._toastCount = 0;
     this.hotbarSlots = []; this.paletteOpen = false;
+    /** items feature: { icon(canvas, itemId), label(itemId) } so hotbar slots can hold item ids (strings) */
+    this.itemRenderer = null;
+    /** items feature hooks: onPalette(open) when the E panel toggles, onIcons() when block tiles became available */
+    this.onPalette = null; this.onIcons = null;
     drawTitle($('title')); drawBackdrop($('backdrop'));
     this._buildQualityOptions($('menu-quality'), true); this._buildQualityOptions($('set-quality'), true);
     $('menu-quality').value = settings.quality; $('seed').value = settings.seed || '';
@@ -182,16 +187,29 @@ export class UI {
   /** @param {number[]} slots block ids @param {number} sel selected index */
   setHotbar(slots, sel, showName = true) {
     this._slots = slots; this._sel = sel;
-    this.hotbarSlots.forEach((d, i) => { d.classList.toggle('sel', i === sel); const id = slots[i]; if (d.dataset.id !== String(id)) { d.dataset.id = id; drawBlockIcon(d.querySelector('canvas'), id); } });
-    if (showName) { const n = $('hotbar-name'); n.textContent = blockLabel(slots[sel]); n.classList.add('show'); clearTimeout(this._nameT); this._nameT = setTimeout(() => n.classList.remove('show'), 1400); }
+    this.hotbarSlots.forEach((d, i) => { d.classList.toggle('sel', i === sel); const id = slots[i]; if (d.dataset.id !== String(id)) { d.dataset.id = id; this._drawSlot(d.querySelector('canvas'), id); } });
+    if (showName) { const n = $('hotbar-name'); n.textContent = this.slotLabel(slots[sel]); n.classList.add('show'); clearTimeout(this._nameT); this._nameT = setTimeout(() => n.classList.remove('show'), 1400); }
   }
+
+  _drawSlot(canvas, id) {
+    if (typeof id === 'string') { if (this.itemRenderer) this.itemRenderer.icon(canvas, id); else canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height); }
+    else if (id == null || id === 0) canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+    else drawBlockIcon(canvas, id);
+  }
+  /** Display name of a hotbar slot value (block id, item id or empty). */
+  slotLabel(id) { return typeof id === 'string' ? (this.itemRenderer ? this.itemRenderer.label(id) : id) : id == null || id === 0 ? '' : blockLabel(id); }
 
   /** Redraw all icons (tiles became available). */
   refreshIcons() {
     this.hotbarSlots.forEach((d) => { d.dataset.id = ''; });
     if (this._slots) this.setHotbar(this._slots, this._sel, false);
-    document.querySelectorAll('#palette-grid .pal').forEach((p) => drawBlockIcon(p.querySelector('canvas'), +p.dataset.id));
+    document.querySelectorAll('#palette-grid .pal:not([data-item])').forEach((p) => drawBlockIcon(p.querySelector('canvas'), +p.dataset.id));
+    if (this.onIcons) this.onIcons();
   }
+
+  /** Modal helpers for features that show their own full-screen overlay (death screen): suspend / resume gameplay input like ui.panel does. */
+  beginModal() { if (this.cb.panelOpen) this.cb.panelOpen(); }
+  endModal() { if (this.cb.panelClose && !this.panels.length) this.cb.panelClose(); }
 
   _buildPalette() {
     const g = $('palette-grid'); g.innerHTML = '';
@@ -202,7 +220,7 @@ export class UI {
       g.appendChild(d);
     }
   }
-  showPalette(on) { this.paletteOpen = on; $('palette').classList.toggle('hidden', !on); }
+  showPalette(on) { this.paletteOpen = on; $('palette').classList.toggle('hidden', !on); if (this.onPalette) { try { this.onPalette(on); } catch (e) { console.error(e); } } }
 
   // ---- debug / fps ----
   get debugOn() { return !this.dbg.classList.contains('hidden'); }

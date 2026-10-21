@@ -5,6 +5,7 @@ import { PRESETS, QUALITY_ORDER } from './shared/quality.js';
 import { EventBus } from './features/events.js';
 import { FeatureRegistry } from './features/registry.js';
 import { loadIdentity, saveIdentity } from './features/identity.js';
+import { Permissions } from './features/permissions.js';
 import { MobAI } from './game/MobAI.js';
 import { loadSave, writeSave, wipeSave, hasSave } from './game/Save.js';
 import { HOTBAR_DEFAULT, PLACEABLE, SOLID, LIQUID, EMIT, OPAQUE, B } from './shared/blocks.js';
@@ -38,6 +39,7 @@ const isTouch = P.touch || (!P.notouch && 'ontouchstart' in window && matchMedia
 const events = new EventBus();
 const registry = new FeatureRegistry();
 const identity = loadIdentity();
+const permissions = new Permissions();
 const canvas = document.getElementById('game');
 // GPU reset / driver crash / too many contexts: save, tell the player, and offer a clean reload (three.js cannot resume mid-session reliably)
 canvas.addEventListener('webglcontextlost', (e) => {
@@ -115,7 +117,7 @@ const ui = new UI(settings, {
   wipe: () => { G.saveOn = false; wipeSave(G.seed); ui.toast('Mundo salvo apagado. Recarregando…'); setTimeout(() => { location.href = location.pathname; }, 700); },
   setting: onSetting,
   selectSlot: (i) => selectSlot(i),
-  pickBlock: (id) => { hotbar.slots[hotbar.sel] = id; ui.setHotbar(hotbar.slots, hotbar.sel); },
+  pickBlock: (id) => setSlot(hotbar.sel, id),
   screenshot: () => { G.wantShot = true; },
   palette: () => togglePalette(),
   viewLabel,
@@ -142,6 +144,11 @@ function onSetting(key, v) {
 }
 
 function selectSlot(i) { hotbar.sel = (i + 9) % 9; ui.setHotbar(hotbar.slots, hotbar.sel); }
+/** Put a block id (number) or item id (string) into hotbar slot i; the items feature (ctx.inventory) honours the minigame lock. */
+function setSlot(i, v) {
+  if (G.ctx && G.ctx.inventory) { G.ctx.inventory.setSlot(i, v); return; }
+  hotbar.slots[i] = v; ui.setHotbar(hotbar.slots, hotbar.sel);
+}
 
 /** Handheld light: warm lantern that follows the camera (caves / night). Glowing blocks in hand make it stronger and wider. */
 function applyHeldLight() {
@@ -333,7 +340,7 @@ async function loadImpl(loader, name, mock) {
 }
 
 /** Find a dry spawn (seed-dependent origin, spiral search) and place the player above it. */
-function findSpawn(world, seed) {
+function findSpawn(world, seed, wantSnow = false) {
   let s = (seed * 2654435761) >>> 0; const rnd = () => ((s = (Math.imul(s, 1664525) + 1013904223) >>> 0) / 4294967296);
   const ox = Math.floor((rnd() - 0.5) * 4000), oz = Math.floor((rnd() - 0.5) * 4000);
   // Golden-angle spiral that keeps growing (≈3 km) until dry, low-lying land is found; prefers beaches/plains over peaks.
@@ -341,7 +348,10 @@ function findSpawn(world, seed) {
   for (let i = 0; i < 2400; i++) {
     const a = i * 2.39996, r = 20 * Math.sqrt(i) * 2, x = Math.floor(ox + Math.cos(a) * r), z = Math.floor(oz + Math.sin(a) * r);
     const y = world.getSurfaceY(x, z);
-    if (y > SEA_LEVEL + 1 && y < SEA_LEVEL + 40) return { x: x + 0.5, y: y + 2, z: z + 0.5 };
+    if (y > SEA_LEVEL + 1 && y < SEA_LEVEL + 40) {
+      const top = world.getBlock(x, y, z); // keep friendly planets from dropping you on a snowfield
+      if (wantSnow || (top !== B.SNOW && top !== B.SNOW_GRASS && top !== B.ICE) || i > 1200) return { x: x + 0.5, y: y + 2, z: z + 0.5 };
+    }
     if (!best && y > SEA_LEVEL + 1) best = { x: x + 0.5, y: y + 2, z: z + 0.5 };
   }
   return best || { x: ox + 0.5, y: Math.max(SEA_LEVEL + 3, world.getSurfaceY(ox, oz) + 2), z: oz + 0.5 };
@@ -395,7 +405,7 @@ async function startGame(seedStr, opts = {}) {
     const sv = G.saveOn ? loadSave(G.seed) : null;
     if (sv && sv.edits && G.world.importEdits) G.world.importEdits(sv.edits);
     G.resumed = !!(sv && sv.pos && P.x === null && P.z === null);
-    const sp = G.resumed ? { x: sv.pos[0], y: sv.pos[1], z: sv.pos[2] } : findSpawn(G.world, G.seed);
+    const sp = G.resumed ? { x: sv.pos[0], y: sv.pos[1], z: sv.pos[2] } : findSpawn(G.world, G.seed, !planet.profile || planet.profile.type === 'frozen');
     const sx = P.x !== null ? parseFloat(P.x) : sp.x, sz = P.z !== null ? parseFloat(P.z) : sp.z;
     const sy = P.y !== null ? parseFloat(P.y) : (P.x !== null || P.z !== null ? G.world.getSurfaceY(Math.floor(sx), Math.floor(sz)) + 2 : sp.y);
     player.teleport(sx, sy, sz);
@@ -425,7 +435,7 @@ async function startGame(seedStr, opts = {}) {
       onPick: (id) => {
         if (!PLACEABLE.includes(id)) return;
         const i = hotbar.slots.indexOf(id);
-        if (i >= 0) selectSlot(i); else { hotbar.slots[hotbar.sel] = id; ui.setHotbar(hotbar.slots, hotbar.sel); }
+        if (i >= 0) selectSlot(i); else setSlot(hotbar.sel, id);
       },
     });
     G.interaction.enabled = false;
@@ -565,7 +575,9 @@ function debugInfo() {
 /** The one object every feature receives. Documented in docs/CONTRACT2.md; add fields here, never reach into main.js internals. */
 function buildCtx(gr, camera, player, controls) {
   return {
-    THREE, events, identity, settings, ui, audio, registry,
+    THREE, events, identity, settings, ui, audio, registry, permissions,
+    /** plain data other features read (e.g. the network layer sends it with every position update): team, hp, held item, extra */
+    localState: { team: null, hp: 20, item: null, extra: {} },
     gr, camera, player, controls, interaction: G.interaction, world: G.world, hotbar, mobs: G.mobs,
     planet: G.planet, role: G.role, net: (G.opts && G.opts.net) || null,
     addHotkey: (code, fn) => controls.extraKeys.set(code, fn),

@@ -69,6 +69,9 @@ def(48, 'torch', { render: RENDER_CROSS, solid: false, opaque: false, cutout: tr
 def(49, 'hay', { tiles: { top: 'hay_top', bottom: 'hay_top', side: 'hay_side' } });
 def(50, 'dirt_path', { tiles: { top: 'path_top', bottom: 'dirt', side: 'path_side' } });
 def(41, 'pink_flower', { render: RENDER_CROSS, solid: false, opaque: false, cutout: true, sway: true, tiles: { all: 'flower_pink' } });
+// --- items (G): ids 51-69 ---
+def(51, 'tnt', { tiles: { top: 'tnt_top', bottom: 'tnt_top', side: 'tnt_side' } });
+B.TNT = 51;
 
 export const BLOCKS = defs;               // sparse array indexed by id
 export const N_BLOCKS = 256;

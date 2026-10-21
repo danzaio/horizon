@@ -258,6 +258,21 @@ const GENS = {
     const t = 0.82 + h2(Math.floor((x + xo) / 8), row, 272) * 0.3 + (h2(x, y, 273) - 0.5) * 0.12;
     return mul([160, 66, 50], t);
   },
+  // --- items (G) ---
+  tnt_top: (x, y) => {
+    const r = Math.hypot(x - 7.5, y - 7.5), plate = r < 3.2 || (x === 7 || x === 8) && (y < 3 || y > 12);
+    return plate ? mul([110, 100, 92], 0.85 + h2(x, y, 391) * 0.2) : mul([196, 56, 46], 0.85 + h2(x, y, 392) * 0.22);
+  },
+  tnt_side: (x, y) => {
+    if (y >= 4 && y <= 11) { // white label band with a dark "TNT" in a 3x5 pixel font
+      const ROWS = { T: ['111', '010', '010', '010', '010'], N: ['101', '111', '111', '101', '101'] }, word = ['T', 'N', 'T'];
+      const li = Math.floor((x - 2) / 4), cx = (x - 2) % 4, ry = y - 5;
+      const ink = li >= 0 && li < 3 && cx >= 0 && cx < 3 && ry >= 0 && ry < 5 && ROWS[word[li]][ry][cx] === '1';
+      return ink ? [40, 36, 36, 255] : mul([232, 226, 214], 0.92 + h2(x, y, 393) * 0.1);
+    }
+    const stripe = x % 4 === 3 ? 0.82 : 1;
+    return mul([196, 56, 46], (0.84 + h2(x, y, 394) * 0.22) * stripe);
+  },
 };
 
 // brain-coral look: bumpy cells with dark grooves

@@ -104,6 +104,7 @@ void main(){
 
 export const LODW_VS = /* glsl */`
 ${UNIFORMS}
+uniform vec2 uWTClamp;   // water tint clamp (planets widen it)
 attribute vec4 aColor;
 varying vec3 vRel;
 varying vec3 vMV;
@@ -115,7 +116,7 @@ void main(){
   vRel = mv.xyz * mat3(viewMatrix);
   vMV = mv.xyz;
   vDepth = min(aColor.a * 64.0 / 16.0, 1.0);
-  vWT = clamp(aColor.rgb / vec3(0.176, 0.392, 0.8), 0.55, 1.4);
+  vWT = clamp(aColor.rgb / vec3(0.176, 0.392, 0.8), uWTClamp.x, uWTClamp.y);
 }
 `;
 

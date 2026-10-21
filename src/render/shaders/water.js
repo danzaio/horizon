@@ -3,6 +3,7 @@ import { DECODE } from './solid.js';
 
 export const WATER_VS = /* glsl */`
 ${UNIFORMS}
+uniform vec2 uWTClamp;   // water tint clamp (planets widen it)
 ${DECODE}
 varying vec3 vRel;
 varying vec3 vMV;
@@ -15,7 +16,7 @@ void main(){
   vRel = mv.xyz * mat3(viewMatrix);
   vMV = mv.xyz;
   vWD = vec2(aTint.a, floor(aMeta.w / 16.0) / 15.0);
-  vWT = clamp(aTint.rgb / vec3(0.176, 0.392, 0.8), 0.55, 1.4);
+  vWT = clamp(aTint.rgb / vec3(0.176, 0.392, 0.8), uWTClamp.x, uWTClamp.y);
 }
 `;
 

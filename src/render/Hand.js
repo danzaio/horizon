@@ -81,6 +81,62 @@ function mk(pos, nrm, uv, lay, idx) {
   return g;
 }
 
+// ---- items (G): held models built from coloured cuboids (pixel units, grip at the origin, forward = -Z, up = +Y) ----
+// box: [x0,y0,z0,x1,y1,z1,[r,g,b],part]  part: 0 static, 1 pulled back by uAnim.x (bow string), 2 emissive, 3 pulsing emissive, 4 flame (scaled by uAnim.z)
+const IVS = /* glsl */`
+attribute vec3 aN; attribute vec3 aC; attribute float aPart;
+uniform vec4 uAnim;   // x charge 0..1, y time, z flame 0..1
+varying vec3 vC; varying vec3 vNW; varying float vE;
+void main(){
+  vec3 p = position; vE = 0.0;
+  if (aPart > 0.5) {
+    if (aPart < 1.5) p.z += uAnim.x * 7.0;
+    else if (aPart < 2.5) vE = 1.0;
+    else if (aPart < 3.5) vE = 0.55 + 0.45 * sin(uAnim.y * 7.0);
+    else { p.y *= uAnim.z * (0.85 + 0.15 * sin(uAnim.y * 40.0)); vE = 1.0; }
+  }
+  vC = aC;
+  vNW = normalize(normalMatrix * aN) * mat3(viewMatrix);
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+}`;
+const IFS = /* glsl */`
+${UNIFORMS}
+${NOISE}
+${TONEMAP_FN}
+uniform vec4 uHandP;
+varying vec3 vC; varying vec3 vNW; varying float vE;
+void main(){
+  vec3 albedo = srgb2lin(vC);
+  vec3 n = normalize(vNW);
+  float ndl = max(dot(n, uKeyDir), 0.0);
+  float sh = 0.55 + 0.45 * (n.y * 0.5 + 0.5);
+  float wet = 1.0 - 0.24 * uWeather.x;
+  vec3 amb = mix(uAmbGround, uAmbSky, n.y * 0.5 + 0.5) * (uHandP.x * uHandP.x * (1.6 - 0.6 * uHandP.x)) * sh;
+  vec3 sun = uKeyColor * ndl * uHandP.w * smoothstep(0.4, 0.9, uHandP.x) * (1.0 - 0.86 * uWeather.x);
+  vec3 held = uHeld.rgb * 0.55 * (1.0 - 0.85 * uHandP.x * (1.0 - uSkyP.x));
+  vec3 col = albedo * wet * (amb + sun + held + vec3(0.03, 0.033, 0.045));
+  col = mix(col, albedo * 2.4, vE);
+  float outAlpha = 1.0;
+  ${OUTPUT}
+}`;
+const ICORN = [[[1, 0, 1], [1, 0, 0], [1, 1, 0], [1, 1, 1]], [[0, 0, 0], [0, 0, 1], [0, 1, 1], [0, 1, 0]], [[0, 1, 1], [1, 1, 1], [1, 1, 0], [0, 1, 0]],
+  [[0, 0, 0], [1, 0, 0], [1, 0, 1], [0, 0, 1]], [[0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]], [[1, 0, 0], [0, 0, 0], [0, 1, 0], [1, 1, 0]]];
+const IFACE = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]], ISHADE = [0.84, 0.84, 1.0, 0.6, 0.92, 0.92];
+function buildBoxModel(boxes) {
+  const pos = [], nrm = [], col = [], part = [], idx = [];
+  for (const [x0, y0, z0, x1, y1, z1, c, pt = 0] of boxes) {
+    for (let f = 0; f < 6; f++) {
+      const base = pos.length / 3, sh = pt >= 2 ? 1 : ISHADE[f];
+      for (const q of ICORN[f]) { pos.push(q[0] ? x1 : x0, q[1] ? y1 : y0, q[2] ? z1 : z0); nrm.push(...IFACE[f]); col.push(c[0] * sh / 255, c[1] * sh / 255, c[2] * sh / 255); part.push(pt); }
+      idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('aN', new THREE.Float32BufferAttribute(nrm, 3));
+  g.setAttribute('aC', new THREE.Float32BufferAttribute(col, 3)); g.setAttribute('aPart', new THREE.Float32BufferAttribute(part, 1)); g.setIndex(idx);
+  return g;
+}
+
 export class Hand {
   /** @param {object} shared global uniforms (GameRenderer.shared) @param {THREE.DataArrayTexture} tiles */
   constructor(shared, tiles) {
@@ -93,7 +149,17 @@ export class Hand {
     this.mesh = new THREE.Mesh(new THREE.BufferGeometry(), this.material);
     this.mesh.frustumCulled = false; this.mesh.renderOrder = 100; this.mesh.visible = false;
     this.root = new THREE.Group(); this.root.add(this.mesh);
-    this.geoms = new Map();
+    // held items (coloured cuboid models, registered by the items feature)
+    this.uAnim = { value: new THREE.Vector4(0, 0, 0, 0) };
+    this.itemMaterial = new THREE.ShaderMaterial({
+      uniforms: Object.assign({ uHandP: this.uP, uAnim: this.uAnim }, shared),
+      vertexShader: IVS, fragmentShader: IFS, side: THREE.FrontSide, depthTest: true, depthFunc: THREE.AlwaysDepth, depthWrite: true, transparent: true, blending: THREE.NoBlending,
+    });
+    this.itemMesh = new THREE.Mesh(new THREE.BufferGeometry(), this.itemMaterial);
+    this.itemMesh.frustumCulled = false; this.itemMesh.renderOrder = 100; this.itemMesh.visible = false;
+    this.root.add(this.itemMesh);
+    this.items = new Map(); this.itemSpec = null; this._postDefs = {};
+    this.geoms = new Map(); this.grassTint = [0.5, 0.74, 0.31]; this.foliageTint = [0.36, 0.61, 0.2];
     this.id = 0; this.pending = 0; this.dip = 0; this.swingT = 1; this.breaking = false; this.phase = 0; this.t = 0; this.speed = 0; this.light = 1; this.lightTarget = 1; this.sun = 1;
   }
 
@@ -101,10 +167,26 @@ export class Hand {
   setPost(post) {
     const d = post ? {} : { NO_POST: 1 };
     if (Object.keys(this.material.defines || {}).length !== Object.keys(d).length) { this.material.defines = d; this.material.needsUpdate = true; }
+    if (Object.keys(this.itemMaterial.defines || {}).length !== Object.keys(d).length) { this.itemMaterial.defines = Object.assign({}, d); this.itemMaterial.needsUpdate = true; }
   }
 
-  /** Select the displayed block (0 = nothing). Plays a lower/raise animation when it changes. */
-  setBlock(id) { if (id !== this.pending) { this.pending = id; this.dip = Math.max(this.dip, 0.001); } }
+  /**
+   * Register a held item model (items feature). spec: { boxes, scale (camera units per pixel), pos:[x,y,z], rot:[x,y,z], swing:'slash'|'thrust'|'throw'|'none' }.
+   * Geometry is built on first use.
+   */
+  registerItem(id, spec) { this.items.set(id, { spec, geo: null }); }
+  /** Animation inputs for the item in hand: charge 0..1 (bow draw), flame 0..1 (jetpack). */
+  setItemAnim(charge, flame) { this.uAnim.value.x = charge; this.uAnim.value.z = flame; }
+
+  /** Planet palette (sRGB bytes) for tinted blocks; null = stock world. Re-applies to the block currently in hand. */
+  setPlanetTint(pal) {
+    this.grassTint = pal && pal.grass ? pal.grass.map((v) => v / 255) : [0.5, 0.74, 0.31];
+    this.foliageTint = pal && pal.foliage ? pal.foliage.map((v) => v / 255) : [0.36, 0.61, 0.2];
+    if (typeof this.id === 'number' && this.id) this._apply(this.id);
+  }
+
+  /** Select the displayed block (number) or item (string id); 0 / null = nothing. Plays a lower/raise animation when it changes. */
+  setBlock(id) { if (id == null) id = 0; if (id !== this.pending) { this.pending = id; this.dip = Math.max(this.dip, 0.001); } }
   /** One punch (place / break). */
   swing() { if (this.swingT >= 0.6) this.swingT = 0; }
   /** Continuous mining swing while the break button is held on a target. */
@@ -113,13 +195,20 @@ export class Hand {
   setLight(light, sun = 1) { this.lightTarget = light; this.sun = sun; }
 
   _apply(id) {
-    this.id = id;
+    this.id = id; this.itemSpec = null; this.itemMesh.visible = false;
+    if (typeof id === 'string') {
+      const it = this.items.get(id); this.mesh.visible = false;
+      if (!it) return;
+      if (!it.geo) { try { it.geo = buildBoxModel(it.spec.boxes); } catch (e) { console.warn('[HZ] item model failed:', id, e); it.geo = new THREE.BufferGeometry(); } }
+      this.itemMesh.geometry = it.geo; this.itemMesh.visible = true; this.itemSpec = it.spec; this.sprite = false;
+      return;
+    }
     if (!id || RENDER[id] === 0) { this.mesh.visible = false; return; }
     let g = this.geoms.get(id);
     if (!g) { g = RENDER[id] === RENDER_CROSS ? buildSprite(id) : buildCube(id); this.geoms.set(id, g); }
     this.mesh.geometry = g; this.mesh.visible = true;
     const tint = TINT[id];
-    this.uTint.value.set(...(tint === TINT_GRASS ? [0.5, 0.74, 0.31] : tint === TINT_FOLIAGE ? [0.36, 0.61, 0.2] : [1, 1, 1]));
+    this.uTint.value.set(...(tint === TINT_GRASS ? this.grassTint : tint === TINT_FOLIAGE ? this.foliageTint : [1, 1, 1]));
     this.uP.value.y = CUTOUT[id] ? 1 : 0; this.uP.value.z = EMIT[id] > 0 ? 1 : 0;
     this.sprite = RENDER[id] === RENDER_CROSS;
     this.material.side = this.sprite ? THREE.DoubleSide : THREE.FrontSide;
@@ -146,6 +235,20 @@ export class Hand {
     const r = this.root, dip = this.dip * this.dip * (3 - 2 * this.dip);
     const bx = Math.cos(this.phase) * 0.012 * bob, by = Math.abs(Math.sin(this.phase)) * 0.018 * bob;
     const idle = Math.sin(this.t * 1.7) * 0.0035;
+    this.uAnim.value.y = this.t;
+    const isp = this.itemSpec;
+    if (isp) { // held item: pose from the spec + a swing style
+      const ps = isp.pos || [0.28, -0.24, -0.5], pr = isp.rot || [0.2, -0.5, 0];
+      let px = ps[0] + bx, py = ps[1] + by + idle - dip * 0.4, pz = ps[2], rx = pr[0] + (m.sprint ? 0.1 : 0), ry = pr[1], rz = pr[2] + bx * 2;
+      switch (isp.swing) {
+        case 'slash': rx -= sw * 1.5; rz += sw * 0.7; px -= sw * 0.14; pz -= sw * 0.1; py += sw * 0.04; break;
+        case 'thrust': pz -= sw * 0.16; rx -= sw * 0.18; break;
+        case 'throw': rx -= sw * 1.0; py += sw * 0.07; pz -= sw * 0.12; break;
+        default: pz -= sw * 0.05;
+      }
+      r.position.set(px, py, pz); r.rotation.set(rx, ry, rz); r.scale.setScalar(isp.scale || 0.022);
+      return;
+    }
     const s = this.sprite ? 0.22 : 0.15;
     r.position.set(0.215 + bx - sw * 0.07, -0.19 + by + idle - dip * 0.34 + sw * 0.03, -0.5 - sw * 0.09);
     r.rotation.set(0.42 - sw * 0.9 + (m.sprint ? 0.12 : 0), -0.7 + sw * 0.25, 0.02 + bx * 2);

@@ -1,0 +1,72 @@
+// Feature "net": peer-to-peer multiplayer without servers (see docs/NET.md). Publishes ctx.net and ctx.dome (never null after init).
+import { defineFeature } from '../registry.js';
+import { Net } from './net.js';
+import { Avatars } from './avatars.js';
+import { openJoinPanel } from './ui-join.js';
+import { createFollow } from './follow.js';
+import { openNetPanel, createChatHud, createStatsLine, showClosed } from './ui-game.js';
+import { parseJoin } from './protocol.js';
+import './net.css';
+
+const S = { net: null, avatars: null, chat: null, stats: null, follow: null, offs: [], bg: 0, last: 0 };
+
+export default defineFeature({
+  id: 'net', order: 5,
+
+  menu(api) {
+    api.ui.addMenuButton({ label: 'Entrar em um planeta', hint: 'Jogar no planeta de um amigo (código ou link)', onClick: () => openJoinPanel(api) });
+    let j = null; try { j = new URLSearchParams(location.search).get('join'); } catch { /* no location */ }
+    if (j && parseJoin(j).kind !== 'bad') setTimeout(() => openJoinPanel(api, j), 0);       // shareable link: ?join=ABCD-EF12
+  },
+
+  init(ctx) {
+    const net = S.net = ctx.net instanceof Net ? ctx.net : new Net(ctx.events, ctx.identity);
+    net.attach(ctx);
+    ctx.net = net; ctx.dome = net.dome;
+    const open = () => openNetPanel(ctx, net);
+    ctx.ui.addToolbarButton({ id: 'net', icon: '🌐', title: 'Online / domo', key: 'O', onClick: open });
+    ctx.addHotkey('KeyO', open);
+    S.chat = createChatHud(ctx, net); S.stats = createStatsLine(ctx, net); S.follow = net.spectate = createFollow(ctx, net);
+    S.offs.push(
+      ctx.events.on('net:role', (e) => { ctx.role = e.role; ctx.ui.setPlanetBadge(badge(ctx, net)); }),
+      ctx.events.on('dome:change', () => ctx.ui.setPlanetBadge(badge(ctx, net))),
+      ctx.events.on('net:closed', (e) => showClosed(ctx, e.text)),
+    );
+    if (net.role === 'guest') ctx.ui.setPlanetBadge(badge(ctx, net));
+    // a hidden tab gets no animation frames: keep the connection alive (pings, edits, snapshots) from a timer instead
+    S.bg = setInterval(() => { if (!document.hidden || net.role === 'solo' || !ctx.ready) return; const now = performance.now(); net.tick(Math.min(0.5, (now - S.last) / 1000)); S.last = now; }, 250);
+  },
+
+  ready(ctx) {
+    const net = S.net; if (!net) return;
+    net.flushEarly();
+    if (net.role === 'guest') {
+      const w = net.welcome, hz = window.__hz;
+      if (w && w.pos && hz && hz.teleport) hz.teleport(w.pos[0] + 1.5, w.pos[1] + 0.5, w.pos[2]);       // spawn next to the host
+      ctx.ui.toast('Você está no planeta de ' + net.hostName + ' · O: jogadores e chat · Enter: falar');
+    }
+  },
+
+  update(dt, ctx) {
+    const net = S.net; if (!net) return;
+    S.last = performance.now();
+    net.tick(dt);
+    if (net.players.size && !S.avatars && ctx.gr && ctx.gr.shared) { try { S.avatars = new Avatars(ctx.gr); } catch (e) { console.error('[HZ] avatars unavailable:', e); net.players.clear(); } }
+    if (S.follow) S.follow.update(dt);
+    if (S.avatars) S.avatars.update(dt, ctx.camera.position, net.players);
+    if (S.stats) S.stats.update();
+  },
+
+  dispose() {
+    clearInterval(S.bg); for (const o of S.offs) o(); S.offs.length = 0;
+    if (S.follow) S.follow.stop(); if (S.avatars) S.avatars.dispose(); if (S.chat) S.chat.dispose(); if (S.stats) S.stats.dispose();
+    if (S.net) S.net.dispose();
+    S.net = S.avatars = S.chat = S.stats = S.follow = null;
+  },
+});
+
+function badge(ctx, net) {
+  const p = ctx.planet, esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const tag = net.role === 'guest' ? ' · visitante' : net.role === 'host' ? ' · domo ' + (net.dome.mode === 'invite' ? 'por convite' : 'aberto') : '';
+  return p.name ? `<b>${esc(p.name)}</b>${p.address ? ' · ' + esc(p.address) : ''}${tag}` : '';
+}
