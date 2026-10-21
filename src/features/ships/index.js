@@ -107,7 +107,7 @@ class ShipFeature {
   toggleCamera() { this.mode = this.mode === '3p' ? '1p' : '3p'; this.camInit = false; if (this.piloting) this.mesh.visible = this.mode === '3p'; this.ctx.ui.toast(this.mode === '3p' ? 'Câmera: terceira pessoa' : 'Câmera: cabine'); }
 
   onB() {
-    if (this.ctx.state !== 'playing') return;
+    if (this.ctx.state !== 'playing' || (this.ctx.car && this.ctx.car.active)) return;
     if (this.piloting) { this.exit(); return; }
     if (this.gun) { this.exitGunner(); return; }
     if (this.alive && Math.hypot(this.x - this.player.x, this.z - this.player.z) < 8 && Math.abs(this.y - this.player.y) < 8) { this.board(); return; }
@@ -337,7 +337,7 @@ export default defineFeature({
     const orig = ctx.player.update.bind(ctx.player);
     ctx.player.update = (dt) => { if (S && S.piloting) S.pilot(dt); else if (S && S.gun) S.gunnerStep(dt); else orig(dt); };
     ctx.addHotkey('KeyB', () => S.onB());
-    ctx.addHotkey('KeyZ', () => { if (S.piloting) S.toggleCamera(); });
+    ctx.addHotkey('KeyZ', () => { if (S.piloting) S.toggleCamera(); else if (ctx.car && ctx.car.active) { /* cars share Z */ } });
     ctx.ui.addToolbarButton({ id: 'ship', icon: '🚀', title: 'Nave (chamar / embarcar / sair)', key: 'B', onClick: () => S.onB() });
     const wheel = ctx.controls.actions.hotbarDelta;
     ctx.controls.actions.hotbarDelta = (d) => { if (S && S.piloting) { S.camDist = Math.max(4, Math.min(22, S.camDist + d * 1.2)); return; } if (wheel) wheel(d); };

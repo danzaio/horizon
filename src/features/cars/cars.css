@@ -1,0 +1,12 @@
+#hz-car-hud { position: fixed; inset: 0; pointer-events: none; z-index: 5; font-family: ui-monospace, Menlo, Consolas, monospace; color: #eaf3ff; }
+#hz-car-hud.hidden { display: none; }
+#hz-car-hud kbd { background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.25); border-radius: 4px; padding: 0 4px; font-size: .85em; }
+.car-dash { position: absolute; left: 50%; bottom: 22%; transform: translateX(-50%); display: flex; align-items: center; gap: 18px; text-shadow: 0 0 8px rgba(80,200,255,.6); }
+.car-spd b { font-size: 38px; } .car-spd small { margin-left: 5px; opacity: .7; } .car-mode { font-size: 18px; color: #ffb36b; min-width: 54px; }
+.car-wheel { width: 54px; height: 54px; border-radius: 50%; border: 6px solid #1a1d24; box-shadow: 0 0 0 2px rgba(255,255,255,.25); position: relative; transition: transform .08s; }
+.car-wheel::before { content: ''; position: absolute; left: 50%; top: 4px; bottom: 50%; width: 6px; margin-left: -3px; background: #1a1d24; } .car-wheel::after { content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 6px; margin-top: -3px; background: #1a1d24; }
+.car-hints { position: absolute; left: 50%; top: 58px; transform: translateX(-50%); font-size: 12px; opacity: .75; background: rgba(0,0,0,.35); padding: 4px 10px; border-radius: 6px; white-space: nowrap; }
+.car-frame { position: absolute; inset: 0; } .car-frame i { position: absolute; background: linear-gradient(180deg, #0d1016, #1c222c); box-shadow: 0 0 20px rgba(0,0,0,.7); }
+.car-frame .a { left: 0; right: 0; bottom: 0; height: 13%; } .car-frame .b { left: 0; top: 0; bottom: 0; width: 5%; clip-path: polygon(0 0, 100% 10%, 40% 100%, 0 100%); } .car-frame .c { right: 0; top: 0; bottom: 0; width: 5%; clip-path: polygon(0 10%, 100% 0, 100% 100%, 60% 100%); }
+#hz-car-hud.ride .car-dash { display: none; }
+@media (max-width: 700px) { .car-hints { display: none; } }
