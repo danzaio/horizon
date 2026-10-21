@@ -46,15 +46,15 @@ addEventListener('keydown', e => {
 addEventListener('keyup', e => keys.delete(e.code));
 addEventListener('blur', () => keys.clear());
 const BIND = {
-  p1: { l: ['KeyA'], r: ['KeyD'], u: ['KeyW'], d: ['KeyS'], p: ['KeyF'], k: ['KeyG'], h: ['KeyH'], pr: ['KeyR'], sp: ['KeyT'] },
-  p2: { l: ['ArrowLeft'], r: ['ArrowRight'], u: ['ArrowUp'], d: ['ArrowDown'], p: ['Numpad1', 'KeyJ'], k: ['Numpad2', 'KeyK'], h: ['Numpad3', 'KeyL'], pr: ['Numpad4', 'KeyU'], sp: ['Numpad5', 'KeyI'] },
+  p1: { l: ['KeyA'], r: ['KeyD'], u: ['KeyW'], d: ['KeyS'], p: ['KeyF'], k: ['KeyG'], h: ['KeyH'], pr: ['KeyR'], pr2: ['KeyE'], bl: ['KeyQ'], sp: ['KeyT'] },
+  p2: { l: ['ArrowLeft'], r: ['ArrowRight'], u: ['ArrowUp'], d: ['ArrowDown'], p: ['Numpad1', 'KeyJ'], k: ['Numpad2', 'KeyK'], h: ['Numpad3', 'KeyL'], pr: ['Numpad4', 'KeyU'], pr2: ['Numpad6', 'KeyO'], bl: ['Numpad0', 'KeyN'], sp: ['Numpad5', 'KeyI'] },
 };
 function readBind(b) {
   const held = n => b[n].some(c => keys.has(c)), ed = n => b[n].some(c => edge.has(c));
-  return { l: held('l'), r: held('r'), u: held('u'), d: held('d'), U: ed('u'), P: ed('p'), K: ed('k'), H: ed('h'), PR: ed('pr'), SP: ed('sp') };
+  return { l: held('l'), r: held('r'), u: held('u'), d: held('d'), B: held('bl'), U: ed('u'), P: ed('p'), K: ed('k'), H: ed('h'), PR: ed('pr'), PR2: ed('pr2'), SP: ed('sp') };
 }
 function orPad(a, b) { const o = {}; for (const k in a) o[k] = a[k] || b[k]; return o; }
-const emptyPad = () => ({ l: false, r: false, u: false, d: false, U: false, P: false, K: false, H: false, PR: false, SP: false });
+const emptyPad = () => ({ l: false, r: false, u: false, d: false, B: false, U: false, P: false, K: false, H: false, PR: false, PR2: false, SP: false });
 const anyEdge = (...codes) => codes.some(c => edge.has(c));
 const confirmEdge = () => anyEdge('Enter', 'NumpadEnter', 'Space', 'KeyF', 'KeyJ', 'Numpad1');
 
@@ -66,15 +66,67 @@ cv.addEventListener('pointerdown', e => {
   tap = { x: (e.clientX - r.left) / r.width * W, y: (e.clientY - r.top) / r.height * H };
   if (e.pointerType === 'touch') isTouch = true;
 });
+// ---- touch controls: floating joystick (left) + action buttons that carry the fighter's real move names (right)
 const touchEl = document.getElementById('touch');
-for (const b of touchEl.querySelectorAll('.tb')) {
-  const k = b.dataset.k;
-  const down = e => { e.preventDefault(); audio.unlock(); if (!keys.has(k)) edge.add(k); keys.add(k); b.classList.add('dn'); try { b.setPointerCapture(e.pointerId); } catch (_) {} };
-  const up = e => { e.preventDefault(); keys.delete(k); b.classList.remove('dn'); };
+const vib = ms => { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (_) { /* unsupported */ } };
+const uPx = () => Math.min(innerHeight * 0.15, innerWidth * 0.11);
+function press(k, on, el) {
+  if (on) { if (!keys.has(k)) edge.add(k); keys.add(k); } else keys.delete(k);
+  if (el) el.classList.toggle('dn', on);
+}
+const tBtn = {};
+function tLabel(id, label, sub = '') { tBtn[id].lab.textContent = label; tBtn[id].sub.textContent = sub; }
+function addBtn(id, k, label, sub, color, size, rx, by, cls) {
+  const b = document.createElement('div'), lab = document.createElement('b'), sb = document.createElement('i');
+  b.className = 'tb ' + cls; b.style.cssText = `--c:${color};--s:${size};--rx:${rx};--by:${by}`; b.append(lab, sb);
+  const down = e => { e.preventDefault(); audio.unlock(); press(k, true, b); vib(8); try { b.setPointerCapture(e.pointerId); } catch (_) { /* noop */ } };
+  const up = e => { e.preventDefault(); press(k, false, b); };
   b.addEventListener('pointerdown', down);
-  b.addEventListener('pointerup', up);
-  b.addEventListener('pointercancel', up);
-  b.addEventListener('lostpointercapture', up);
+  for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) b.addEventListener(ev, up);
+  touchEl.appendChild(b); tBtn[id] = { el: b, lab, sub: sb }; tLabel(id, label, sub);
+}
+//          id    key       label     sub      color      size  right  bottom class
+addBtn('p',  'KeyF',   'SOCO',   '',      '#2bff5a', 1.3,  0.35, 0.3,  'fb');
+addBtn('k',  'KeyG',   'CHUTE',  '',      '#ff3030', 1.3,  1.8,  0.3,  'fb');
+addBtn('h',  'KeyH',   'PESADO', '',      '#ffd400', 1.3,  3.25, 0.3,  'fb');
+addBtn('r',  'KeyR',   'ESP 1',  '★¼',    '#ff8a1c', 1.05, 0.35, 1.85, 'fb');
+addBtn('r2', 'KeyE',   'ESP 2',  '★¼',    '#ff8a1c', 1.05, 1.55, 1.85, 'fb');
+addBtn('b',  'KeyQ',   'DEFESA', 'segure', '#29b8ff', 1.05, 2.75, 1.85, 'fb');
+addBtn('sp', 'KeyT',   'SOLO!',  'barra cheia', '#29d8ff', 1.5, 4.9, 0.9, 'fb sp');
+addBtn('pz', 'Escape', 'II',     '',      '#ffffff', 0.7,  0,    0.15, 'pb');
+['KeyF', 'KeyG', 'KeyH'].forEach((k, i) => addBtn('ln' + i, k, '', '', ['#2bff5a', '#ff3030', '#ffd400'][i], 1.6, 0, 0.5, 'lane l' + i));
+const setTouchLabels = def => { tLabel('r', def.btn.r, '★¼'); tLabel('r2', def.btn.r2, '★¼'); tLabel('h', def.btn.h); };
+
+const jz = document.createElement('div'), jBase = document.createElement('div'), jKnob = document.createElement('div');
+jz.id = 'jz'; jBase.className = 'stick base'; jKnob.className = 'stick knob'; touchEl.append(jz, jBase, jKnob);
+let joy = null;
+function joyShow(ox, oy, kx, ky, on) {
+  for (const [el, x, y] of [[jBase, ox, oy], [jKnob, kx, ky]]) { el.style.left = x + 'px'; el.style.top = y + 'px'; el.classList.toggle('act', on); }
+}
+function joyRest() { const u = uPx(), x = u * 2.2, y = innerHeight - u * 2.2; joyShow(x, y, x, y, false); }
+function joyMove(e) {
+  const u = uPx(), R = u;
+  let dx = e.clientX - joy.ox, dy = e.clientY - joy.oy; const d = Math.hypot(dx, dy);
+  if (d > R) { dx = dx / d * R; dy = dy / d * R; }
+  joyShow(joy.ox, joy.oy, joy.ox + dx, joy.oy + dy, true);
+  press('KeyA', dx < -u * 0.3); press('KeyD', dx > u * 0.3); press('KeyW', dy < -u * 0.5); press('KeyS', dy > u * 0.42);
+}
+function joyEnd(e) { if (!joy || e.pointerId !== joy.id) return; joy = null; for (const k of ['KeyA', 'KeyD', 'KeyW', 'KeyS']) press(k, false); joyRest(); }
+jz.addEventListener('pointerdown', e => {
+  if (joy) return; e.preventDefault(); audio.unlock();
+  joy = { id: e.pointerId, ox: e.clientX, oy: e.clientY }; try { jz.setPointerCapture(e.pointerId); } catch (_) { /* noop */ } joyMove(e);
+});
+jz.addEventListener('pointermove', e => { if (joy && e.pointerId === joy.id) { e.preventDefault(); joyMove(e); } });
+for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) jz.addEventListener(ev, joyEnd);
+joyRest(); addEventListener('resize', () => { if (!joy) joyRest(); });
+addEventListener('contextmenu', e => e.preventDefault());
+function tryFullscreen() { // phones: go fullscreen + landscape on the first tap
+  try {
+    const el = document.documentElement;
+    if (!document.fullscreenElement && el.requestFullscreen) {
+      el.requestFullscreen({ navigationUI: 'hide' }).then(() => screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape')).catch(() => {});
+    }
+  } catch (_) { /* unsupported */ }
 }
 
 // =====================================================================================
@@ -238,7 +290,8 @@ const CHARS = {
     guitar: 'v', gtrCol: '#e3121c', gtrColS: '#8d0a12', gtrGuard: '#f6f0e4',
     accent: '#ff2a2a', accent2: '#ffd400', bg: ['#5a0010', '#c8102e'],
     proj: 'foice', projName: 'FOICE E MARTELO', proj2: 'sigilo', proj2Name: 'LIBERA O SIGILO!', heavy: 'hammer', superName: 'SOLO DO COMPANHEIRO',
-    moves: ['R: FOICE E MARTELO', '↓+R: LIBERA O SIGILO!', 'H: MARTELADA'],
+    moves: ['ESP 1: FOICE E MARTELO', 'ESP 2: LIBERA O SIGILO!', 'PESADO: MARTELADA'],
+    btn: { r: 'FOICE', r2: 'SIGILO', h: 'MARTELO' },
     torcida: { name: 'EXÉRCITO DO LULA', leader: 'JANONES', leaderId: 'janones', shout: 'EXPLODE!!!', say: 'Explode!', pitch: 1.35,
       col: '#c8122c', cloth: '#c8122c', emblem: 'star', emblemCol: '#ffd400', tint: '#ff4a5a', signs: ['COMPANHEIRO', 'O BARBA', 'PICANHA'] },
     stats: [['FORÇA', 5], ['VELOCIDADE', 3], ['CARISMA', 5]],
@@ -258,7 +311,8 @@ const CHARS = {
     guitar: 'x', gtrCol: '#0e9a48', gtrColS: '#05592a', gtrGuard: '#ffd21a',
     accent: '#ffd21a', accent2: '#0e9a48', bg: ['#063d1f', '#0e9a48'],
     proj: 'bola', projName: 'BOLA ZERO UM', proj2: 'lulinha', proj2Name: 'E O LULINHA?', heavy: 'guitar', superName: 'SOLO ZERO UM',
-    moves: ['R: BOLA ZERO UM', '↓+R: E O LULINHA?', 'H: GUITARRADA'],
+    moves: ['ESP 1: BOLA ZERO UM', 'ESP 2: E O LULINHA?', 'PESADO: GUITARRADA'],
+    btn: { r: 'BOLA', r2: 'LULINHA', h: 'GUITARRA' },
     torcida: { name: 'TROPA DO FLÁVIO', leader: 'NIKOLAS "CHUPETINHA"', leaderId: 'nikolas', shout: 'AVANTE, TROPA!!!', say: 'Avante, tropa!', pitch: 1.1,
       col: '#0e9a48', cloth: '#0e9a48', emblem: '01', emblemCol: '#ffd21a', tint: '#c8ff3a', signs: ['ZERO UM', 'MERMÃO', 'TROPA'] },
     stats: [['FORÇA', 4], ['VELOCIDADE', 5], ['CARISMA', 3]],
@@ -972,6 +1026,8 @@ class Fighter {
       case 'idle': case 'walk': case 'crouch': {
         if (game.phase !== 'fight') { this.state = 'idle'; this.vx = 0; break; }
         if (pad.SP && this.meter >= 100) { startSolo(this); return; }
+        if (pad.B) { this.vx = 0; this.state = pad.d ? 'crouch' : 'idle'; break; }
+        if (pad.PR2 && this.startMove('proj2')) break;
         if (pad.PR && this.startMove(pad.d ? 'proj2' : 'proj')) break;
         if (pad.H) { this.startMove('heavy'); break; }
         if (pad.K) { this.startMove(pad.d ? 'sweep' : 'kick'); break; }
@@ -1031,6 +1087,7 @@ class Fighter {
     const t = this.t;
     switch (this.state) {
       case 'idle': {
+        if (this.pad.B && game.phase === 'fight') { tgt = P_.block; rate = 0.45; break; }
         tgt = copyPose(P_.idle); const b = Math.sin(t * 0.09);
         tgt.kf += b * 4 * D; tgt.kb -= b * 3 * D; tgt.sf += b * 3 * D; tgt.sb -= b * 3 * D; tgt.lean += b * 1.5 * D; break;
       }
@@ -1040,7 +1097,7 @@ class Fighter {
         tgt.kf = (-22 - Math.max(0, Math.cos(ph)) * 34) * D; tgt.kb = (-8 - Math.max(0, -Math.cos(ph)) * 34) * D;
         tgt.lean += 4 * D; rate = 0.35; break;
       }
-      case 'crouch': tgt = P_.crouch; break;
+      case 'crouch': tgt = this.pad.B ? P_.cblock : P_.crouch; break;
       case 'jump': tgt = P_.jump; break;
       case 'attack': {
         const mv = this.move;
@@ -1098,7 +1155,7 @@ function tryHit(att, def, mv, x0, y0, x1, y1, isProj) {
   const dirx = isProj ? Math.sign(isProj.vx) : att.facing;
   const blockable = (def.canAct() || def.state === 'block') && !def.airborne;
   const low = def.pad.d;
-  const blocked = blockable && def.holdingBack() && (!mv.low || low) && (!mv.air || !low);
+  const blocked = blockable && (def.pad.B || (def.holdingBack() && (!mv.low || low) && (!mv.air || !low)));
   const pw = att.def.power;
   if (blocked) {
     def.state = 'block'; def.blockLow = low; def.st = mv.bstun; def.vx = dirx * mv.kb * 0.8;
@@ -1255,7 +1312,7 @@ function drawSoloOverlay(c) {
   // strike buttons
   const laneX = (lane, k) => { const w = lerp(wT, wB, k); return cx + ((lane + 0.5) / 3 * 2 - 1) * w; };
   const kStrike = 1;
-  const labels = S.att.ctrl === 'p2' ? ['J', 'K', 'L'] : S.att.ctrl === 'cpu' ? ['', '', ''] : isTouch ? ['SOCO', 'CHUTE', 'GUIT'] : ['F', 'G', 'H'];
+  const labels = S.att.ctrl === 'p2' ? ['J', 'K', 'L'] : S.att.ctrl === 'cpu' || isTouch ? ['', '', ''] : ['F', 'G', 'H'];
   for (let l = 0; l < 3; l++) {
     const x = laneX(l, kStrike), y = yB;
     ell(c, x, y, 30, 14); inked(c, '#1a1020', 5); ell(c, x, y, 22, 9); c.lineWidth = 5; c.strokeStyle = LANE_COL[l]; c.stroke();
@@ -1358,6 +1415,7 @@ function newMatch() {
   game.ai = game.mode === 1 ? new AI(game.f2) : null;
   game.round = 1; startRound(); setScene('fight');
   if (r3) r3.setTorcidas([game.f1.def.id, game.f2.def.id]);
+  setTouchLabels(game.f1.def);
 }
 function startRound() {
   for (const f of [game.f1, game.f2]) f.reset();
@@ -1659,11 +1717,13 @@ function drawTorcidaIntro(c) {
   });
 }
 function drawControlsHelp(c, y) {
-  const lines = game.mode === 2
-    ? ['J1: A/D andar · W pular · S agachar/defender baixo · F soco · G chute · H pesado · R / S+R especiais · T solo',
-       'J2: setas · J soco · K chute · L pesado · U / ↓+U especiais · I solo (ou Numpad 1-5)']
-    : ['A/D ou ←/→ andar · W pular · S agachar · segure TRÁS para defender',
-       'F soco · G chute · H golpe pesado · R / S+R especiais (¼ star power) · T SOLO (star power cheio)'];
+  const lines = isTouch
+    ? ['Joystick à esquerda: andar · ↑ pular · ↓ agachar', 'Botões à direita: SOCO · CHUTE · PESADO · DEFESA · ESP 1/2 · SOLO']
+    : game.mode === 2
+      ? ['J1: A/D andar · W pular · S agachar · F soco · G chute · H pesado · Q defesa · R/E especiais · T solo',
+         'J2: setas · J soco · K chute · L pesado · N defesa · U/O especiais · I solo (ou Numpad 0-6)']
+      : ['A/D andar · W pular · S agachar · F soco · G chute · H pesado · Q defesa (segure)',
+         'R / E especiais (¼ star power) · T SOLO (star power cheio) · Esc pausa'];
   c.save(); c.font = `20px ${FONT}`; c.textAlign = 'center'; c.fillStyle = '#e9e2ff';
   lines.forEach((l, i) => { c.lineWidth = 4; c.strokeStyle = OUT; c.strokeText(l, W / 2, y + i * 28); c.fillText(l, W / 2, y + i * 28); });
   c.restore();
@@ -1754,15 +1814,74 @@ function menuBox(c, x, y, w, h, sel, title, sub) {
   c.font = `20px ${FONT}`; c.textAlign = 'center'; c.fillStyle = sel ? '#ffe9b0' : '#8a7a8a'; c.fillText(sub, 0, 32);
   c.restore();
 }
+const modeItems = () => isTouch
+  ? [{ k: '1p', t: '1 JOGADOR', s: 'você contra a CPU' }, { k: 'help', t: 'COMO JOGAR', s: 'botões, golpes e barras' }]
+  : [{ k: '1p', t: '1 JOGADOR', s: 'você contra a CPU' }, { k: '2p', t: '2 JOGADORES', s: 'no mesmo teclado' }, { k: 'help', t: 'COMO JOGAR', s: 'golpes, barras e controles' }];
+const modeY = (i, n) => 395 + (i - (n - 1) / 2) * 118;
 function renderMode() {
-  const c = ctx, t = game.t;
+  const c = ctx, t = game.t, items = modeItems();
   c.fillStyle = '#12020a'; c.fillRect(0, 0, W, H);
   rays(c, W / 2, 360, t, ['#2a0410', '#160208']);
   drawLogo(c, W / 2, 130, 0.6);
-  menuBox(c, W / 2, 330, 560, 110, game.modeSel === 0, '1 JOGADOR', 'você contra a CPU');
-  menuBox(c, W / 2, 470, 560, 110, game.modeSel === 1, '2 JOGADORES', 'no mesmo teclado');
-  game.mode = game.modeSel + 1;
-  drawControlsHelp(c, 620);
+  items.forEach((it, i) => menuBox(c, W / 2, modeY(i, items.length), 560, 100, game.modeSel === i, it.t, it.s));
+  drawControlsHelp(c, 640);
+}
+function activateMode(item) {
+  audio.sfx('confirm');
+  if (item.k === 'help') { game.afterHelp = 'mode'; setScene('help'); return; }
+  game.mode = item.k === '2p' ? 2 : 1; setScene('select');
+}
+
+// ---------- COMO JOGAR: one screen with every button, bar and item
+function wrapText(c, text, x, y, maxW, lh) {
+  let line = '';
+  for (const w of text.split(' ')) {
+    const test = line ? line + ' ' + w : w;
+    if (c.measureText(test).width > maxW && line) { c.fillText(line, x, y); y += lh; line = w; } else line = test;
+  }
+  c.fillText(line, x, y);
+}
+const HELP_COLS = [
+  ['LUTAR', [
+    ['#2bff5a', 'SOCO', 'Rápido, de perto. Bom para começar combos.'],
+    ['#ff3030', 'CHUTE', 'Mais alcance. Agachado, vira rasteira.'],
+    ['#ffd400', 'PESADO', 'Forte e lento, derruba. Martelada do Lula, guitarrada do Flávio.'],
+    ['#29b8ff', 'DEFESA', 'Segure para se proteger de tudo. Andar para trás também defende.'],
+  ]],
+  ['BARRAS E ESPECIAIS', [
+    ['#29d8ff', 'STAR POWER', 'A barra azul enche batendo e apanhando.'],
+    ['#ff8a1c', 'ESP 1 e ESP 2', 'Gastam ¼ da barra: um golpe especial cada, de cada lutador.'],
+    ['#29d8ff', 'SOLO', 'Com a barra cheia: mini Guitar Hero! Acerte as notas verde, vermelha e amarela.'],
+    ['#e3121c', 'TORCIDA', 'Golpes enchem a torcida. Cheia, o puxador grita e dá bônus.'],
+  ]],
+];
+function renderHelp() {
+  const c = ctx, t = game.t;
+  c.fillStyle = '#12020a'; c.fillRect(0, 0, W, H);
+  rays(c, W / 2, 360, t, ['#2a0410', '#160208']);
+  comicText(c, 'COMO JOGAR', W / 2, 58, 70);
+  HELP_COLS.forEach(([title, items], ci) => {
+    const x = ci ? 935 : 345;
+    tornPaper(c, x, 355, 590, 440, ci ? 0.01 : -0.01, '#f1e6c8', title.length);
+    comicText(c, title, x, 170, 36, '#ff5a3a', '#b00020', 'center', 6);
+    items.forEach(([chip, head, body], i) => {
+      const y = 222 + i * 86;
+      ell(c, x - 250, y + 10, 22, 22); inked(c, chip, 4);
+      c.textAlign = 'left'; c.textBaseline = 'alphabetic';
+      c.font = `27px ${FONT}`; c.fillStyle = OUT; c.fillText(head, x - 215, y + 6);
+      c.font = 'bold 18px Arial, sans-serif'; c.fillStyle = '#3a2a30'; wrapText(c, body, x - 215, y + 30, 480, 21);
+    });
+  });
+  const tip = (txt, y, size) => { c.font = `${size}px ${FONT}`; c.textAlign = 'center'; c.lineWidth = 5; c.strokeStyle = OUT; c.strokeText(txt, W / 2, y); c.fillStyle = '#ffe9a0'; c.fillText(txt, W / 2, y); };
+  tip('ITENS: vacina do Zé Gotinha (+vida) · CDB do Vorcaro (+star power)', 606, 22);
+  drawControlsHelp(c, 640);
+  if ((game.t >> 5) % 2 === 0) tip(isTouch ? 'TOQUE PARA CONTINUAR' : 'ENTER PARA CONTINUAR', 702, 26);
+}
+const helpSeen = () => { try { return localStorage.getItem('gb3_help') === '1'; } catch (_) { return true; } };
+const markHelp = () => { try { localStorage.setItem('gb3_help', '1'); } catch (_) { /* private mode */ } };
+function startFromSelect() {
+  audio.sfx('confirm'); newMatch();
+  if (helpSeen()) setScene('vs'); else { game.afterHelp = 'vs'; setScene('help'); } // first match: show how to play once
 }
 const panelPath = (c, x) => { c.beginPath(); c.moveTo(x - 270, 110); c.lineTo(x + 280, 110); c.lineTo(x + 260, 620); c.lineTo(x - 290, 620); c.closePath(); };
 function renderSelect() {
@@ -1879,18 +1998,27 @@ function update() {
   if (edge.has('KeyM')) audio.toggleMute();
   switch (game.scene) {
     case 'title':
-      if (confirmEdge() || tap) { audio.unlock(); audio.sfx('confirm'); setScene('mode'); }
+      if (confirmEdge() || tap) { audio.unlock(); if (isTouch) tryFullscreen(); audio.sfx('confirm'); setScene('mode'); }
       break;
-    case 'mode':
-      if (anyEdge('ArrowUp', 'KeyW', 'ArrowDown', 'KeyS')) { game.modeSel = 1 - game.modeSel; audio.sfx('select'); }
-      if (tap) { const s = tap.y < 400 ? 0 : 1; if (s === game.modeSel || isTouch) { game.modeSel = s; game.mode = s + 1; audio.sfx('confirm'); setScene('select'); } else { game.modeSel = s; audio.sfx('select'); } }
-      else if (confirmEdge()) { game.mode = game.modeSel + 1; audio.sfx('confirm'); setScene('select'); }
+    case 'mode': {
+      const items = modeItems(), n = items.length;
+      if (anyEdge('ArrowUp', 'KeyW')) { game.modeSel = (game.modeSel + n - 1) % n; audio.sfx('select'); }
+      if (anyEdge('ArrowDown', 'KeyS')) { game.modeSel = (game.modeSel + 1) % n; audio.sfx('select'); }
+      game.modeSel = Math.min(game.modeSel, n - 1);
+      if (tap) {
+        const i = Math.round((tap.y - 395) / 118 + (n - 1) / 2);
+        if (i >= 0 && i < n && Math.abs(tap.y - modeY(i, n)) < 60) { if (i === game.modeSel || isTouch) { game.modeSel = i; activateMode(items[i]); } else { game.modeSel = i; audio.sfx('select'); } }
+      } else if (confirmEdge()) activateMode(items[game.modeSel]);
       else if (anyEdge('Escape')) setScene('title');
+      break;
+    }
+    case 'help':
+      if (game.sceneT > 15 && (confirmEdge() || tap || anyEdge('Escape'))) { markHelp(); audio.sfx('select'); setScene(game.afterHelp || 'mode'); }
       break;
     case 'select':
       if (anyEdge('ArrowLeft', 'KeyA', 'ArrowRight', 'KeyD')) { game.charSel = 1 - game.charSel; audio.sfx('select'); }
-      if (tap) { const s = tap.x < W / 2 ? 0 : 1; if (s === game.charSel && game.sceneT > 10) { audio.sfx('confirm'); newMatch(); setScene('vs'); } else { game.charSel = s; audio.sfx('select'); } }
-      else if (confirmEdge() && game.sceneT > 5) { audio.sfx('confirm'); newMatch(); setScene('vs'); }
+      if (tap) { const s = tap.x < W / 2 ? 0 : 1; if (s === game.charSel && game.sceneT > 10) startFromSelect(); else { game.charSel = s; audio.sfx('select'); } }
+      else if (confirmEdge() && game.sceneT > 5) startFromSelect();
       else if (anyEdge('Escape')) setScene('mode');
       break;
     case 'vs':
@@ -1914,6 +2042,7 @@ function render() {
   switch (game.scene) {
     case 'title': renderTitle(); break;
     case 'mode': renderMode(); break;
+    case 'help': renderHelp(); break;
     case 'select': renderSelect(); break;
     case 'vs': renderVS(); break;
     case 'fight': renderFight(); break;
@@ -1921,7 +2050,14 @@ function render() {
   }
   ctx.setTransform(scale, 0, 0, scale, 0, 0);
   drawPost(ctx);
-  touchEl.classList.toggle('on', isTouch && game.scene === 'fight');
+  renderTouchUI();
+}
+function renderTouchUI() {
+  const f = game.f1, show = isTouch && game.scene === 'fight', soloOn = !!game.solo;
+  touchEl.className = (show ? 'on' : '') + (soloOn ? (game.solo.att === f ? ' solo' : ' wait') : '') + (game.paused ? ' pz' : '');
+  if (!show) return;
+  tBtn.r.el.classList.toggle('off', f.meter < 25); tBtn.r2.el.classList.toggle('off', f.meter < 25);
+  tBtn.sp.el.classList.toggle('rdy', f.meter >= 100 && !soloOn);
 }
 let last = performance.now(), acc = 0;
 function frame(now) {

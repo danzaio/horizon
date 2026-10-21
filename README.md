@@ -14,15 +14,16 @@ Jogo de luta satírico entre caricaturas do Lula e do Flávio, no estilo de *Gui
   * *GitHub Pages*: depois do merge na `main`, o workflow publica em https://danzaio.github.io/horizon/luta/ (link permanente).
   * *Link temporário na hora*: `npm run luta:online` sobe o jogo e um túnel público (usa `cloudflared` se estiver instalado, senão `localtunnel` via npx) e imprime a URL para mandar a quem for jogar.
   * *Um arquivo só*: `npm run build:luta` gera `dist-luta/index.html` (~690 kB, tudo embutido): abre com duplo clique, ou é só jogar em qualquer hospedagem estática.
-* **1 jogador** (contra a CPU) ou **2 jogadores** no mesmo teclado; controles de toque no celular.
+* **1 jogador** (contra a CPU) ou **2 jogadores** no mesmo teclado. Há uma tela **COMO JOGAR** no menu (e ela aparece sozinha na primeira partida).
+* **Celular** (na horizontal; em pé aparece "GIRE O CELULAR", e o primeiro toque tenta a tela cheia): **joystick flutuante** à esquerda (qualquer ponto da metade esquerda; ↑ pula, ↓ agacha) e, à direita, botões com o nome real de cada golpe: SOCO, CHUTE, PESADO (martelo/guitarra), DEFESA (segurar), ESP 1, ESP 2 e SOLO (aparece com a barra cheia). Durante o solo a interface troca para 3 botões coloridos, um por trilha. Os especiais ficam apagados enquanto falta star power. Vibra ao tocar, onde o aparelho permite. 2 jogadores só com teclado.
 * Melhor de 3 rounds, 99 s. Bater/apanhar enche o **star power**: ¼ libera um especial, cheio libera o **SOLO** — um mini Guitar Hero de 3 trilhas (F/G/H) em que cada nota acertada solta um raio no adversário.
 
 | Ação | J1 | J2 |
 |---|---|---|
 | Andar / pular / agachar | `A` `D` / `W` / `S` | setas |
-| Defender | segurar para trás (agachado defende golpes baixos) | idem |
+| Defender | `Q` (segurar: defende tudo) ou andar para trás | `N` / Numpad 0, ou para trás |
 | Soco · Chute · Golpe pesado | `F` · `G` · `H` | `J` · `K` · `L` (ou Numpad 1-3) |
-| Especial · Especial 2 | `R` · `S`+`R` | `U` · `↓`+`U` (ou Numpad 4) |
+| Especial 1 · Especial 2 | `R` · `E` | `U` · `O` (ou Numpad 4 · 6) |
 | Solo | `T` | `I` (ou Numpad 5) |
 | Pausa · Som | `Esc` · `M` | |
 
