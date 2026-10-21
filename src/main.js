@@ -317,13 +317,14 @@ document.addEventListener('pointerlockerror', () => {
   if (G.state === 'playing' && !G.noLock && G.controls && !G.controls._lockAct) { G.needClick = true; ui.toast('Clique na tela para voltar a controlar'); return; }
   if (G.state === 'playing' && !G.noLock) pauseGame('Não foi possível capturar o mouse. Clique em “Continuar”.');
 });
+document.addEventListener('keydown', (e) => { if (e.code === 'Escape') window.__hzEscAt = performance.now(); }, true);
 // a click on the game view recaptures the mouse (after Esc closed a panel the browser refuses to re-lock without a real click)
 document.addEventListener('pointerdown', (e) => {
   if (isTouch || G.noLock || !G.controls || G.state !== 'playing' || G.controls.locked || e.button !== 0) return;
   if (e.target && e.target.closest && e.target.closest('#panels, #menu, #pause, #palette, #loading, .hz-death, button, input, select')) return;
   G.needClick = false; G.controls.lock();
 }, true);
-document.addEventListener('keydown', (e) => { if (e.code === 'Escape' && G.state === 'paused' && performance.now() - G.pauseAt > 350) resumeGame(); });
+// (Esc does not resume from the pause screen: the browser would refuse the pointer lock without a click; use "Continuar" or click)
 document.addEventListener('visibilitychange', () => { if (G.aq) { if (document.hidden) G.aq.pause(); else if (G.state === 'playing') G.aq.resume(performance.now()); } });
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -422,6 +423,7 @@ async function startGame(seedStr, opts = {}) {
     player.flying = P.fly || sy > G.world.getSurfaceY(Math.floor(sx), Math.floor(sz)) + 6;
 
     const controls = G.controls = new Controls({ canvas, player, touch: isTouch });
+    controls.onNeedClick = () => { G.needClick = true; ui.toast('Clique na tela para voltar a controlar'); };
     controls.sens = settings.sens;
     controls.onDragMode = () => {
       G.noLock = true;

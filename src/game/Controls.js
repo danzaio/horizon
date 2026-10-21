@@ -29,7 +29,11 @@ export class Controls {
 
   lock() {
     // Failures only count as "pointer lock unavailable" when the request had a user gesture behind it.
-    const act = navigator.userActivation ? navigator.userActivation.isActive : true;
+    // Escape never counts as a user gesture for pointer lock (Chrome refuses): don't ask, and don't mistake the refusal for "lock unavailable" (that
+    // used to flip the game into drag-look mode with a permanent cursor). The next click recaptures the mouse (see main.js pointerdown handler).
+    if (performance.now() - (window.__hzEscAt || 0) < 400) { this._lockAct = false; if (this.onNeedClick) this.onNeedClick(); return; }
+    const t = window.event && window.event.type, mouse = t === 'pointerdown' || t === 'mousedown' || t === 'mouseup' || t === 'click' || t === 'pointerup';
+    const act = (navigator.userActivation ? navigator.userActivation.isActive : true) && mouse;   // only a real mouse click can prove "lock is unavailable here"
     this._lockAct = act;
     const fail = () => { if (act) this.enterDragMode(); };
     try { const p = this.canvas.requestPointerLock(); if (p && p.catch) p.catch(fail); } catch { fail(); }
