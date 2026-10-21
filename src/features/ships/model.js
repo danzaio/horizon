@@ -32,7 +32,10 @@ const CORNERS = [
   [[0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]], [[1, 0, 0], [0, 0, 0], [0, 1, 0], [1, 1, 0]],
 ];
 
-export function buildShipGeometry() {
+export function buildShipGeometry() { return buildGeometry(BOXES); }
+
+/** merged cuboid geometry from [x0,y0,z0,x1,y1,z1,[r,g,b],emissive,accent,mirror] boxes (also used by the cars) */
+export function buildGeometry(boxes) {
   const pos = [], nrm = [], col = [], flag = [], idx = [];
   const add = (x0, y0, z0, x1, y1, z1, c, em, ac) => {
     for (let f = 0; f < 6; f++) {
@@ -44,7 +47,7 @@ export function buildShipGeometry() {
       idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
     }
   };
-  for (const [x0, y0, z0, x1, y1, z1, c, em, ac, mirror] of BOXES) {
+  for (const [x0, y0, z0, x1, y1, z1, c, em, ac, mirror] of boxes) {
     add(x0, y0, z0, x1, y1, z1, c, em, ac);
     if (mirror) add(-x1, y0, z0, -x0, y1, z1, c, em, ac);
   }

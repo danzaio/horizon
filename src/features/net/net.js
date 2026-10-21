@@ -81,7 +81,7 @@ export class Net {
     if (!this.ctx) throw new Error('Entre em um planeta antes de abrir o domo.');
     if (!canHost()) throw new Error(NO_HOST_TEXT);
     if (this.role === 'host') return this.hostInfo;
-    const mode = o.mode === 'invite' ? 'invite' : 'open', code = makeRoomCode();
+    const mode = o.mode === 'invite' ? 'invite' : 'open', code = typeof o.code === 'string' && /^[2-9A-Z]{4}-[2-9A-Z]{4}$/.test(o.code) ? o.code : makeRoomCode();
     this.role = 'host'; this.isAuthority = true; this.hostId = this.localId; this.hostName = this.identity.name;
     this.dome.mode = mode; this.ctx.planet.domeMode = mode;
     const info = this.hostInfo = { code, mode, link: this._link(code), trystero: 'off', trysteroError: '', local: false, rtc: rtcAvailable() };

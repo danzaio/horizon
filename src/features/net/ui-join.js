@@ -7,12 +7,12 @@ import { h, copyButton, qrCanvas } from './dom.js';
 const urlFlag = (k) => { try { return new URLSearchParams(location.search).get(k); } catch { return null; } };
 
 /** Race the local lobby (same browser) and the public rendezvous; first transport wins, the loser is closed. */
-export function connectByCode(room, onStatus) {
+export function connectByCode(room, onStatus, ms = 40000) {
   if (!canHost()) return Promise.reject(new Error(NO_HOST_TEXT));
   const tries = [];
   tries.push(localAvailable() ? localConnect(room, 1800) : Promise.reject(new Error('local')));
   const useT = rtcAvailable() && urlFlag('nettrystero') !== '0';
-  if (useT) { onStatus('Procurando o anfitrião na rede pública…'); tries.push(trysteroConnect(room, 40000)); }
+  if (useT) { onStatus('Procurando o anfitrião na rede pública…'); tries.push(trysteroConnect(room, ms)); }
   return new Promise((resolve, reject) => {
     let won = false, left = tries.length, lastErr = null;
     for (const p of tries) p.then((tr) => { if (won) { tr.close('lost-race'); return; } won = true; resolve(tr); }, (e) => {
@@ -23,7 +23,7 @@ export function connectByCode(room, onStatus) {
 }
 
 /** Opens the join panel. `prefill` auto-starts when it came from a ?join= link. */
-export function openJoinPanel(api, prefill) {
+export function openJoinPanel(api, prefill, opts = {}) {
   const { ui } = api;
   let cur = null, busy = false, panel = null;
   const status = h('div', { class: 'nt-status' });
@@ -51,9 +51,11 @@ export function openJoinPanel(api, prefill) {
     const net = new Net(api.events, api.identity);
     try {
       let tr = null, lastErr = null;
-      for (let attempt = 1; attempt <= 3 && !tr; attempt++) {     // the host may still be reaching the public relays: keep looking for ~2 min
-        try { tr = await connectByCode(p.room, say); } catch (e) { lastErr = e; if (attempt < 3) say('Ainda procurando o anfitrião… (tentativa ' + (attempt + 1) + '/3) — ele precisa estar com o jogo aberto.'); }
+      const maxTries = opts.attempts || 3;
+      for (let attempt = 1; attempt <= maxTries && !tr; attempt++) {     // the host may still be reaching the public relays: keep looking for ~2 min
+        try { tr = await connectByCode(p.room, say, opts.ms || 40000); } catch (e) { lastErr = e; if (attempt < maxTries) say('Ainda procurando o anfitrião… (tentativa ' + (attempt + 1) + '/3) — ele precisa estar com o jogo aberto.'); }
       }
+      if (!tr && opts.onNotFound) { busy = false; go.disabled = false; if (panel) panel.close(); opts.onNotFound(); return; }
       if (!tr) throw lastErr || new Error('Anfitrião não encontrado.');
       cur = tr; await finish(net, tr, p.token, 25000, p.room);
     } catch (e) { say((e.message || String(e)) + ' Dica: peça ao amigo para clicar em 🔗 de novo e mandar o link novo, ou use o modo manual.', 'err'); busy = false; go.disabled = false; }
@@ -91,7 +93,7 @@ export function openJoinPanel(api, prefill) {
     h('p', { text: 'Digite o código da sala que o anfitrião mostrou (ou abra o link que ele mandou).' }),
     h('label', { class: 'field' }, h('span', { text: 'Código da sala' }), code), go, status,
     !canHost() ? h('p', { class: 'nt-warn', text: NO_HOST_TEXT }) : noRtc ? h('p', { class: 'nt-warn', text: 'Este navegador/ambiente não permite WebRTC (por exemplo, dentro do Artifact do Claude): só é possível entrar em planetas abertos em outra aba deste mesmo navegador.' }) : manualBox,
-    h('p', { class: 'nt-warn', text: 'Conexão direta entre navegadores (WebRTC, só STUN, sem servidor de retransmissão): algumas redes (CGNAT, Wi‑Fi corporativo, 4G) bloqueiam a ligação e não há como contornar sem um servidor.' }));
+    h('p', { class: 'nt-warn', text: 'Conexão direta entre navegadores (WebRTC) com retransmissão pública de reserva: se mesmo assim não conectar, a sua rede está bloqueando — tente outra rede ou o modo manual.' }));
   panel = ui.panel({ id: 'net-join', title: 'Entrar em um planeta', subtitle: 'multijogador direto, sem servidor', content: body, width: 520, onClose: () => { if (cur) cur.close('cancelled'); } });
   if (prefill) { code.value = prefill; setTimeout(start, 50); }
   return panel;

@@ -79,6 +79,7 @@ export function sanitizePlanet(p) {
     name: noHtml(cleanText(p.name, 40)) || 'Planeta', type: typeof p.type === 'string' ? noHtml(p.type.slice(0, 24)) : 'terran', profile,
     ownerId: noHtml(cleanText(p.ownerId, 16)), ownerName: cleanName(p.ownerName, 'Anfitrião'), isHome: !!p.isHome,
     domeMode: p.domeMode === 'open' || p.domeMode === 'invite' ? p.domeMode : 'closed',
+    publicRoom: p.publicRoom && typeof p.publicRoom.id === 'string' ? { id: p.publicRoom.id.replace(/[^a-z0-9]/gi, '').slice(0, 8) } : null,
   };
 }
 

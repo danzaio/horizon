@@ -311,8 +311,8 @@ function togglePalette() {
 }
 document.addEventListener('pointerlockchange', () => { if (G.controls && !G.controls.locked && G.state === 'playing' && !G.noLock) pauseGame(); });
 document.addEventListener('pointerlockerror', () => {
-  if (G.controls && G.controls._lockAct) G.controls.enterDragMode(); // lock refused despite a user gesture (sandboxed frame): switch to drag-look
-  if (G.controls && G.controls.dragMode) return;
+  if (G.controls) G.controls.lockFailed();   // retries; drag-look only after repeated refusals to real mouse clicks (sandboxed frames)
+  if (G.controls && (G.controls.dragMode || G.controls._lockAct)) return;
   // Re-locking after closing a panel with Esc has no user activation (Esc never counts as one): don't pause, just ask for a click
   if (G.state === 'playing' && !G.noLock && G.controls && !G.controls._lockAct) { G.needClick = true; ui.toast('Clique na tela para voltar a controlar'); return; }
   if (G.state === 'playing' && !G.noLock) pauseGame('Não foi possível capturar o mouse. Clique em “Continuar”.');
@@ -320,9 +320,9 @@ document.addEventListener('pointerlockerror', () => {
 document.addEventListener('keydown', (e) => { if (e.code === 'Escape') window.__hzEscAt = performance.now(); }, true);
 // a click on the game view recaptures the mouse (after Esc closed a panel the browser refuses to re-lock without a real click)
 document.addEventListener('pointerdown', (e) => {
-  if (isTouch || G.noLock || !G.controls || G.state !== 'playing' || G.controls.locked || e.button !== 0) return;
+  if (isTouch || (G.noLock && !(G.controls && G.controls.dragMode)) || !G.controls || G.state !== 'playing' || (G.controls.locked && !G.controls.dragMode) || e.button !== 0) return;
   if (e.target && e.target.closest && e.target.closest('#panels, #menu, #pause, #palette, #loading, .hz-death, button, input, select')) return;
-  G.needClick = false; G.controls.lock();
+  G.needClick = false; G.controls._fails = 0; G.controls.lock();   // also leaves drag-look if the real lock works now
 }, true);
 // (Esc does not resume from the pause screen: the browser would refuse the pointer lock without a click; use "Continuar" or click)
 document.addEventListener('visibilitychange', () => { if (G.aq) { if (document.hidden) G.aq.pause(); else if (G.state === 'playing') G.aq.resume(performance.now()); } });
@@ -379,6 +379,7 @@ async function startGame(seedStr, opts = {}) {
     await registry.load();
     let planet = opts.planet || await registry.resolvePlanet({ identity, seedStr, params: P, opts });
     if (!planet) { const sd = parseSeed(seedStr || (P.autostart ? '' : identity.id)); planet = { seed: sd, profile: null, address: null, name: seedStr ? `Mundo ${sd}` : 'Seu planeta', ownerId: identity.id, ownerName: identity.name, isHome: !seedStr, domeMode: 'closed' }; }
+    if (opts.publicRoom) planet.publicRoom = opts.publicRoom;   // official public room: the net feature hosts it with its fixed code
     G.planet = planet; G.seed = planet.seed;
     const [GR, WorldCls, terrainMod] = await Promise.all([loadImpl(rendererLoader, 'GameRenderer', wantMockRender), loadImpl(worldLoader, 'World', wantMockWorld), terrainLoader ? terrainLoader().catch(() => null) : null]);
     G.mockRender = !GR; G.mockWorld = !WorldCls;
@@ -609,6 +610,7 @@ function installHooks() {
     lookAt: (yawDeg, pitchDeg) => { G.player.setLook(yawDeg * Math.PI / 180, pitchDeg * Math.PI / 180); },
     setTime: (h) => { G.gr.time.hours = h; },
     setWeather: (kind, instant = true) => { WX.fixed = true; applyWeather(kind, instant); },
+    autoWeather: () => { WX.fixed = false; WX.timer = 5; },
     screenshotReady: () => hz.ready && G.frames > 3,
     stats: () => ({ fps: G.fps, cpuMs: G.cpuMs, frames: G.frames, state: G.state, pos: [G.player.x, G.player.y, G.player.z], onGround: G.player.onGround, frozen: G.player.frozen,
       quality: G.aq.current, render: G.gr.info(), world: G.world.stats ? G.world.stats() : null, mock: { world: G.mockWorld, render: G.mockRender } }),

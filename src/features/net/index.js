@@ -3,7 +3,8 @@ import { defineFeature } from '../registry.js';
 import { Net, canHost, NO_HOST_TEXT } from './net.js';
 import { Avatars } from './avatars.js';
 import { openJoinPanel } from './ui-join.js';
-import { openLobbyPanel } from './ui-lobby.js';
+import { openLobbyPanel, enterPublicRoom } from './ui-lobby.js';
+import { PUBLIC_ROOMS, roomById } from './publicRooms.js';
 import { createFollow } from './follow.js';
 import { openNetPanel, createChatHud, createStatsLine, showClosed } from './ui-game.js';
 import { parseJoin } from './protocol.js';
@@ -19,6 +20,8 @@ export default defineFeature({
     api.ui.addMenuButton({ label: '🌍 Salas públicas', hint: 'Ver e entrar em mundos abertos agora', onClick: () => openLobbyPanel(api) });
     let j = null; try { j = new URLSearchParams(location.search).get('join'); } catch { /* no location */ }
     if (j && parseJoin(j).kind !== 'bad') setTimeout(() => openJoinPanel(api, j), 0);       // shareable link: ?join=ABCD-EF12
+    let pub = null; try { pub = new URLSearchParams(location.search).get('pub'); } catch { /* no location */ }
+    if (pub && roomById(pub)) setTimeout(() => enterPublicRoom(api, pub), 0);                 // way back into an official room: ?pub=praca
   },
 
   init(ctx) {
@@ -60,6 +63,9 @@ export default defineFeature({
   ready(ctx) {
     const net = S.net; if (!net) return;
     net.flushEarly();
+    const pr = ctx.planet && ctx.planet.publicRoom;
+    if (pr && net.role === 'solo') hostPublicRoom(ctx, net, pr);                 // first arrival: take the host seat of this official room
+    if (pr && net.role === 'guest') ctx.events.on('net:closed', () => { ctx.ui.toast('O anfitrião da sala saiu — reentrando…'); setTimeout(() => { try { location.href = location.origin + location.pathname + '?pub=' + pr.id; } catch { /* ignore */ } }, 2500); });
     if (net.role === 'guest') {
       const w = net.welcome, hz = window.__hz;
       if (w && w.pos && hz && hz.teleport) hz.teleport(w.pos[0] + 1.5, w.pos[1] + 0.5, w.pos[2]);       // spawn next to the host
@@ -89,4 +95,16 @@ function badge(ctx, net) {
   const p = ctx.planet, esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const tag = net.role === 'guest' ? ' · visitante' : net.role === 'host' ? ' · domo ' + (net.dome.mode === 'invite' ? 'por convite' : 'aberto') : '';
   return p.name ? `<b>${esc(p.name)}</b>${p.address ? ' · ' + esc(p.address) : ''}${tag}` : '';
+}
+
+/** become the host of an official public room: fixed code, open dome, listed; PvP / horde per the room's rules */
+async function hostPublicRoom(ctx, net, pr) {
+  const def = roomById(pr.id); if (!def) return;
+  try {
+    await net.startHosting({ mode: 'open', code: pr.code });
+    net.dome.setPerm('pvp', !!def.pvp);
+    await net.setPublic(true, def.icon + ' ' + def.name);
+    ctx.ui.toast(def.icon + ' Você abriu a sala “' + def.name + '” — quem entrar vai cair aqui com você');
+    if (def.horde && ctx.horde) setTimeout(() => ctx.horde.start(1), 4000);
+  } catch (e) { console.warn('[HZ] public room host failed:', e); ctx.ui.toast('Não consegui abrir a sala pública: ' + (e && e.message ? e.message : e)); }
 }

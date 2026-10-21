@@ -21,6 +21,8 @@ export class Controls {
     this._tj = { id: -1, cx: 0, cy: 0, fwd: 0, strafe: 0, sprint: false };
     this._tl = { id: -1, x: 0, y: 0 };
     this._tbtn = { jump: false, down: false };
+    this._fails = 0; this._lfT = 0; this._rt = 0;
+    document.addEventListener('pointerlockchange', () => { if (document.pointerLockElement === this.canvas) { this._fails = 0; if (this.dragMode) { this.dragMode = false; this._drag = null; } } });
     this._bind();
   }
 
@@ -34,9 +36,19 @@ export class Controls {
     if (performance.now() - (window.__hzEscAt || 0) < 400) { this._lockAct = false; if (this.onNeedClick) this.onNeedClick(); return; }
     const t = window.event && window.event.type, mouse = t === 'pointerdown' || t === 'mousedown' || t === 'mouseup' || t === 'click' || t === 'pointerup';
     const act = (navigator.userActivation ? navigator.userActivation.isActive : true) && mouse;   // only a real mouse click can prove "lock is unavailable here"
-    this._lockAct = act;
-    const fail = () => { if (act) this.enterDragMode(); };
-    try { const p = this.canvas.requestPointerLock(); if (p && p.catch) p.catch(fail); } catch { fail(); }
+    this._lockAct = act; this._req();
+  }
+  _req() { try { const p = this.canvas.requestPointerLock(); if (p && p.catch) p.catch(() => this.lockFailed()); } catch { this.lockFailed(); } }
+  /**
+   * A pointer-lock request was refused (called from the promise AND from the `pointerlockerror` event: deduplicated). Browsers also refuse for ~1.3 s after the user
+   * left the lock with Esc, so a single refusal never means "unavailable": retry, and only after 3 refusals backed by mouse clicks fall back to drag-look.
+   */
+  lockFailed() {
+    const now = performance.now(); if (now - (this._lfT || 0) < 80) return; this._lfT = now;
+    if (!this._lockAct || this.dragMode) return;
+    this._fails = (this._fails || 0) + 1;
+    if (this._fails >= 3) { this.enterDragMode(); return; }
+    clearTimeout(this._rt); this._rt = setTimeout(() => { if (!this.locked && this.active) this._req(); }, 1350);
   }
   /** Fallback input: left-drag looks around, hold still to break, quick tap (or right click) to place. */
   enterDragMode() { if (this.dragMode) return; this.dragMode = true; if (this.onDragMode) this.onDragMode(); }

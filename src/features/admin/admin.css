@@ -1,0 +1,9 @@
+.adm { display: flex; flex-direction: column; gap: 10px; max-height: 72vh; overflow: auto; padding-right: 4px; }
+.adm-sec { border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px 10px; background: rgba(255,255,255,.03); }
+.adm-sec h3 { margin: 0 0 6px; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: #ffb36b; }
+.adm-row { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+.adm-sl { display: flex; align-items: center; gap: 8px; min-width: 250px; flex: 1; font-size: 13px; } .adm-sl span { min-width: 118px; opacity: .85; } .adm-sl input { flex: 1; } .adm-sl b { min-width: 54px; text-align: right; font-family: var(--mono); }
+.adm-ck { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.adm-players { display: flex; flex-direction: column; gap: 6px; } .adm-pl { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; } .adm-pl b { min-width: 110px; }
+.adm-warn { opacity: .85; line-height: 1.5; }
+.adm select, .adm input[type=number] { background: rgba(0,0,0,.35); color: inherit; border: 1px solid var(--line); border-radius: 8px; padding: 4px 6px; }
