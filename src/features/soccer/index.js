@@ -207,7 +207,8 @@ export default defineFeature({
       if (K.st) { mk('🔴 Time Vermelho', () => { K.setMyTeam(0); ctx.ui.toast('Você está no Vermelho'); }); mk('🔵 Time Azul', () => { K.setMyTeam(1); ctx.ui.toast('Você está no Azul'); }); st.textContent = 'Partida em andamento: ' + K.score[0] + ' × ' + K.score[1]; }
       ctx.ui.panel({ id: 'soccer', title: 'Futebol', subtitle: 'cooperativo e competitivo', content: el, width: 480 });
     };
-    ctx.ui.addToolbarButton({ id: 'soccer', icon: '⚽', title: 'Futebol', onClick: open });
+    ctx.ui.addToolbarButton({ id: 'soccer', icon: '⚽', title: 'Futebol', key: 'I', onClick: open });
+    ctx.addHotkey('KeyI', open);
     ctx.addHotkey('KeyU', () => K.myKick());
     ctx.soccer = { start: () => K.start(), stop: () => K.stop(), get active() { return K.st !== 0; }, get score() { return K.score.slice(); }, open, get _k() { return K; } };
   },

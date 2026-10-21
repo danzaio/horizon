@@ -138,3 +138,4 @@ Guia de arquitetura/entrevista, vista X-ray, modo benchmark, gravador cinematogr
 - 23:45 — **Carro BYD Dolphin Mini** (src/features/cars): R chama/entra/sai, WASD, Espaço drift, Shift sport, X buzina, Z câmera, atropela monstros/animais, passageiro (R perto de carro dirigido), réplica car:s/car:g. Testado (dirige, vira, sai). Próximo: futebol + minigames, criaturas (pixelmon-like).
 - 00:10 — **Futebol** (src/features/soccer) e **4 minigames novos** (Chão é Lava, Sumô, Battle Royale, Domínio) prontos; minigame.test 25/25. Próximo: criaturas estilo Pixelmon (task #16).
 - 00:55 — **Bichinhos (critters)**: 38 espécies, selvagens por bioma, cápsulas, grupo/caixa/dex (N), batalha selvagem + PvP determinística (testado 2 navegadores). battle.test 8/8. Todas as tarefas pedidas até aqui entregues; pendente: balanceamento, sons, mais minigames, testar online real.
+- 01:00 — hotkey I abre o painel de Futebol.
