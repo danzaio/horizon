@@ -11,28 +11,45 @@ html,body{margin:0;height:100%;background:#000;overflow:hidden;touch-action:none
 #stack{position:relative;overflow:hidden;background:#000}
 #stack canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 #grain{position:absolute;inset:0;pointer-events:none;mix-blend-mode:overlay;opacity:.9}
-#touch{position:fixed;inset:0;pointer-events:none;display:none}
+:root{--u:min(15vh,11vw)}
+#touch{position:fixed;inset:0;pointer-events:none;display:none;z-index:5;font-family:Impact,'Arial Black',sans-serif}
 #touch.on{display:block}
-.tb{position:absolute;pointer-events:auto;border-radius:50%;background:rgba(10,4,14,.45);border:3px solid rgba(255,255,255,.6);color:#fff;
-  font:900 13px Impact,'Arial Black',sans-serif;display:flex;align-items:center;justify-content:center;text-align:center;line-height:1;
-  text-shadow:0 2px 0 #000;box-sizing:border-box;letter-spacing:.5px}
-.tb.dn{background:rgba(255,255,255,.35)}
+#jz{position:absolute;left:0;top:28%;bottom:0;width:46%;pointer-events:auto;touch-action:none}
+.stick{position:absolute;border-radius:50%;transform:translate(-50%,-50%);pointer-events:none;opacity:.4;transition:opacity .15s;box-sizing:border-box}
+.stick.act{opacity:1}
+.stick.base{width:calc(var(--u)*2.3);height:calc(var(--u)*2.3);border:3px solid rgba(255,255,255,.75);background:rgba(10,4,14,.35)}
+.stick.knob{width:calc(var(--u)*1.05);height:calc(var(--u)*1.05);background:rgba(255,255,255,.55);border:3px solid #fff}
+.tb{position:absolute;pointer-events:auto;touch-action:none;border-radius:50%;box-sizing:border-box;
+  width:calc(var(--u)*var(--s,1.1));height:calc(var(--u)*var(--s,1.1));
+  right:calc(var(--u)*var(--rx,0) + env(safe-area-inset-right,0px));bottom:calc(var(--u)*var(--by,0) + env(safe-area-inset-bottom,0px));
+  background:rgba(10,4,14,.55);border:3px solid var(--c,#fff);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;text-shadow:0 2px 0 #000;letter-spacing:.5px}
+.tb b{font-weight:400;font-size:calc(var(--u)*.2);line-height:1;letter-spacing:0}
+.tb i{font-style:normal;font-size:calc(var(--u)*.17);opacity:.9;margin-top:2px;line-height:1}
+.tb.dn{background:rgba(255,255,255,.4);transform:scale(.93)}
+.tb.off{opacity:.4}
+.sp{display:none}
+.sp.rdy{display:flex;animation:pulse .5s infinite alternate;background:rgba(41,184,255,.35)}
+@keyframes pulse{to{transform:scale(1.1);box-shadow:0 0 22px #29d8ff}}
+.lane{display:none;right:auto;left:calc(50% + (var(--i) - 1)*var(--u)*1.9 - var(--u)*.8);--s:1.6;--by:.5;background:rgba(10,4,14,.4)}
+.l0{--i:0}.l1{--i:1}.l2{--i:2}
+.pb{right:auto;left:50%;margin-left:calc(var(--u)*-.35);--s:.7;--by:.15;font-size:calc(var(--u)*.3)}
+.solo .fb,.solo #jz,.solo .stick{display:none}
+.solo .lane{display:flex}
+.wait .fb,.wait #jz,.wait .stick,.wait .lane{display:none}
+.pz .fb,.pz #jz,.pz .stick,.pz .lane{display:none}
+#rotate{position:fixed;inset:0;background:#0a0410;color:#fff;display:none;flex-direction:column;align-items:center;justify-content:center;z-index:30;
+  font-family:Impact,'Arial Black',sans-serif;text-align:center;font-size:7vw;letter-spacing:1px;line-height:1.1}
+#rotate span{display:block;font-size:22vw;animation:rot 1.6s ease-in-out infinite alternate}
+#rotate small{display:block;font-family:Arial,sans-serif;font-size:4vw;opacity:.7;margin-top:2vw}
+@keyframes rot{to{transform:rotate(-90deg)}}
+@media (orientation:portrait) and (pointer:coarse){#rotate{display:flex}}
 </style>
 </head>
 <body>
 <div id="wrap"><div id="stack"><canvas id="bg"></canvas><canvas id="gl"></canvas><canvas id="fg"></canvas><div id="grain"></div></div></div>
-<div id="touch">
-  <div class="tb" data-k="KeyA" style="left:14px;bottom:78px;width:64px;height:64px">◀</div>
-  <div class="tb" data-k="KeyD" style="left:142px;bottom:78px;width:64px;height:64px">▶</div>
-  <div class="tb" data-k="KeyW" style="left:78px;bottom:142px;width:64px;height:64px">▲</div>
-  <div class="tb" data-k="KeyS" style="left:78px;bottom:14px;width:64px;height:64px">▼</div>
-  <div class="tb" data-k="KeyF" style="right:178px;bottom:18px;width:74px;height:74px;border-color:#2bff5a">SOCO</div>
-  <div class="tb" data-k="KeyG" style="right:96px;bottom:44px;width:74px;height:74px;border-color:#ff3030">CHUTE</div>
-  <div class="tb" data-k="KeyH" style="right:14px;bottom:78px;width:74px;height:74px;border-color:#ffd400">GUI<br>TARRA</div>
-  <div class="tb" data-k="KeyR" style="right:150px;bottom:112px;width:62px;height:62px;border-color:#ff8a1c">ESPE<br>CIAL</div>
-  <div class="tb" data-k="KeyT" style="right:70px;bottom:150px;width:62px;height:62px;border-color:#29b8ff">SOLO</div>
-  <div class="tb" data-k="Escape" style="left:50%;bottom:8px;margin-left:-22px;width:44px;height:44px;font-size:16px">II</div>
-</div>
+<div id="touch"></div>
+<div id="rotate"><span>📱</span>GIRE O CELULAR<small>o jogo é na horizontal</small></div>
 <script type="module" src="./src/main.js"></script>
 </body>
 </html>
