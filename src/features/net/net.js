@@ -3,7 +3,7 @@
 import { PROTO, MAX_PLAYERS, KIND_RE, Bucket, makeRoomCode, makeToken, makeId, cleanName, cleanColor, cleanText, cleanItem, cleanTeam, cleanExtra, cleanEdits, sanitizePlanet, clampNum, clampInt, r2, r3 } from './protocol.js';
 import { Link } from './transport.js';
 import { RemotePlayer } from './remote.js';
-import { LocalLobby, localAvailable, trysteroHost, createManualInvite } from './signal.js';
+import { LocalLobby, localAvailable, trysteroHost, createManualInvite, lobbyJoin } from './signal.js';
 import { Sync } from './sync.js';
 
 const POS_MS = 1000 / 15, PING_MS = 2000, ROSTER_MS = 3000, TIME_MS = 4000, TIMEOUT_MS = 14000, EDIT_FLUSH_MS = 50;
@@ -107,8 +107,25 @@ export class Net {
     return info;
   }
 
+  /** List (or unlist) this open room in the public room list. */
+  async setPublic(on, name) {
+    this._pubStop(); this.pubName = name ? String(name).slice(0, 32) : this.pubName;
+    if (!on) { this.events.emit('net:hostInfo', this.hostInfo); return false; }
+    if (this.role !== 'host' || !this.hostInfo || this.dome.mode !== 'open') throw new Error('Abra o domo (modo Aberto) para listar a sala.');
+    this._pub = await lobbyJoin({ getAd: () => this._ad() });
+    this.events.emit('net:hostInfo', this.hostInfo); return true;
+  }
+  get isPublic() { return !!this._pub; }
+  _ad() {
+    if (this.role !== 'host' || !this.hostInfo || this.dome.mode !== 'open') return null;
+    const pf = this.ctx && this.ctx.planet, max = this.dome.maxPlayers || 8;
+    return JSON.stringify({ c: this.hostInfo.code, n: this.pubName || (pf && pf.name) || 'Planeta', o: this.identity.name, t: (pf && pf.profile && pf.profile.type) || '', p: this.players.size + 1, m: max, v: PROTO });
+  }
+  _pubStop() { if (this._pub) { try { this._pub.stop(); } catch { /* ignore */ } this._pub = null; } }
+
   stopHosting() {
     if (this.role !== 'host') return;
+    this._pubStop();
     for (const p of [...this.peers.values()]) { this._pSend(p, { t: 'kick', reason: 'dome-closed' }); setTimeout(() => p.link.close('dome-closed'), 150); this._dropPeer(p, 'dome-closed', true); }
     for (const p of [...this._pending]) p.link.close('dome-closed');
     for (const m of this._manual) m.cancel(); this._manual.clear();

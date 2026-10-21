@@ -1,7 +1,7 @@
 // Node-only checks for the pure parts of the net feature (no browser): manual-code codec, link fragmentation, join-code parsing,
 // protocol sanitisers and the Trystero driver against an in-memory fake `joinRoom` (the real relays are unreachable from the sandbox).
 //   node scripts/nettest-unit.mjs
-import { parseSdp, buildSdp, packSignal, unpackSignal, trysteroHost, trysteroConnect } from '../src/features/net/signal.js';
+import { parseSdp, buildSdp, packSignal, unpackSignal, trysteroHost, trysteroConnect, lobbyJoin, sanitizeAd } from '../src/features/net/signal.js';
 import { Link, Transport } from '../src/features/net/transport.js';
 import { parseJoin, cleanText, cleanEdits, sanitizePlanet, Bucket, cleanName } from '../src/features/net/protocol.js';
 
@@ -67,7 +67,7 @@ function fakeJoin(selfId) {
     let onMsg = null;
     const me = { id: selfId, api: null, deliver: (d, from) => onMsg && onMsg(d, { peerId: from }) };
     const api = { onPeerJoin: null, onPeerLeave: null, leave: async () => { room.delete(selfId); for (const o of room.values()) o.api.onPeerLeave && o.api.onPeerLeave(selfId); },
-      makeAction: () => ({ send: async (d, o) => { const t = room.get(o && o.target); if (!t) throw new Error('gone'); queueMicrotask(() => t.deliver(d, selfId)); }, set onMessage(f) { onMsg = f; } }) };
+      makeAction: () => ({ send: async (d, o) => { if (!(o && o.target)) { for (const t of room.values()) if (t !== me) queueMicrotask(() => t.deliver(d, selfId)); return; } const t = room.get(o.target); if (!t) throw new Error('gone'); queueMicrotask(() => t.deliver(d, selfId)); }, set onMessage(f) { onMsg = f; } }) };
     me.api = api;
     for (const o of room.values()) { o.api.onPeerJoin && queueMicrotask(() => o.api.onPeerJoin(selfId)); queueMicrotask(() => api.onPeerJoin && api.onPeerJoin(o.id)); }
     room.set(selfId, me);
@@ -87,6 +87,16 @@ ok('trystero messages flow both ways', hl.length === 1 && hl[0].t === 'hello' &&
 th.stop();
 const miss = await trysteroConnect('ZZZZ-ZZZZ', 150, fakeJoin('G3')).catch((e) => e.message);
 ok('no host -> friendly timeout error', /não foi encontrado/.test(String(miss)), String(miss));
+
+// ---- public room list
+const seenAds = [];
+const hostLobby = await lobbyJoin({ getAd: () => JSON.stringify({ c: 'ABCD-EF23', n: 'Meu <b>mundo</b>', o: 'Ana', t: 'lush', p: 2, m: 8, v: 1 }), joinImpl: fakeJoin('LH') });
+const browser = await lobbyJoin({ onAd: (ad, peer) => seenAds.push([ad, peer]), joinImpl: fakeJoin('LB') });
+await sleep(80);
+ok('lobby: browser receives the host advert', seenAds.length >= 1 && seenAds[0][0].c === 'ABCD-EF23' && seenAds[0][1] === 'LH');
+ok('lobby: advert text is sanitised', seenAds[0] && !/[<>]/.test(seenAds[0][0].n) && seenAds[0][0].p === 2, seenAds[0] && seenAds[0][0].n);
+ok('lobby: junk adverts are rejected', sanitizeAd({ c: 'nope', n: 'x' }) === null && sanitizeAd(null) === null && sanitizeAd({ c: 'ABCD-EF23', n: 'x'.repeat(500), p: 99 }).n.length <= 32);
+hostLobby.stop(); browser.stop();
 
 console.log(fails ? `\n${fails} FAILED` : '\nall unit checks passed');
 process.exit(fails ? 1 : 0);

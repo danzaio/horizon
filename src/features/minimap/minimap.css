@@ -1,0 +1,10 @@
+#hz-minimap { position: absolute; right: 14px; top: 14px; width: 156px; pointer-events: none; z-index: 4; }
+#hz-minimap canvas { display: block; width: 156px; height: 156px; border-radius: 50%; box-shadow: 0 4px 18px rgba(0,0,0,.55), 0 0 0 3px rgba(10,16,28,.7); background: #0a0f18; }
+#hz-minimap .mm-info { margin-top: 5px; text-align: center; font: 11px ui-monospace, Menlo, Consolas, monospace; color: #dbe9ff; text-shadow: 0 1px 3px #000; }
+#hz-minimap .mm-btns { position: absolute; right: -2px; bottom: 18px; display: flex; flex-direction: column; gap: 3px; pointer-events: auto; }
+#hz-minimap .mm-btns button { width: 22px; height: 22px; padding: 0; border-radius: 6px; border: 1px solid rgba(160,200,255,.4); background: rgba(10,16,28,.75); color: #cfe3ff; font-size: 14px; line-height: 1; cursor: pointer; }
+#hz-minimap .mm-btns button:hover { background: rgba(40,60,100,.9); }
+@media (max-width: 700px) { #hz-minimap { width: 110px; right: 8px; top: 8px; } #hz-minimap canvas { width: 110px; height: 110px; } #hz-minimap .mm-btns { bottom: 10px; } }
+/* the toolbar moves below the map and wraps into extra columns instead of running off screen */
+#toolbar { top: 200px !important; max-height: calc(100vh - 215px); flex-wrap: wrap-reverse; align-content: flex-start; }
+@media (max-width: 700px) { #toolbar { top: 140px !important; max-height: calc(100vh - 150px); } }

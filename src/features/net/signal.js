@@ -3,7 +3,7 @@
 //  * Local    - BroadcastChannel lobby for tabs of the same browser (local multiplayer, automated tests).
 //  * Trystero - public BitTorrent/Nostr relays are only the rendezvous; short room code. NOT TESTED on the dev machine (no egress).
 import { LocalTransport, RtcTransport, Transport, makePeerConnection, ICE_SERVERS, TURN_SERVERS } from './transport.js';
-import { randomString, ROOM_APP_ID } from './protocol.js';
+import { randomString, ROOM_APP_ID, PROTO, cleanText, noHtml, clampInt } from './protocol.js';
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Manual codes. Binary layout (then optional deflate-raw, CRC16, base64url, prefix "hz1."):
@@ -278,4 +278,54 @@ export async function trysteroConnect(room, ms = 40000, joinImpl) {
     const t = setTimeout(() => { d.leave(); rej(new Error('O anfitrião não foi encontrado na rede pública. Confira o código ou use o modo manual.')); }, ms);
     d.waiters.push((tr) => { clearTimeout(t); res(tr); });
   });
+}
+
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Public room list. A fixed Trystero room ("lobby") that every host who ticked "sala pública" and every browser of the list joins; hosts broadcast a
+// tiny advert (room code, name, players) every few seconds, browsers collect them. No server: the same public relays as the rendezvous.
+// ---------------------------------------------------------------------------------------------------------------------
+const LOBBY_ROOM = 'public-lobby-v1', ROOM_RE = /^[2-9A-Z]{4}-[2-9A-Z]{4}$/;
+export function sanitizeAd(o) {
+  if (!o || typeof o !== 'object' || typeof o.c !== 'string' || !ROOM_RE.test(o.c)) return null;
+  const t = (v, n) => noHtml(cleanText(v, n)).trim();
+  return { c: o.c, n: t(o.n, 32) || 'Planeta sem nome', o: t(o.o, 20) || 'Anônimo', t: t(o.t, 16), p: clampInt(o.p, 1, 8, 1), m: clampInt(o.m, 1, 8, 8), v: clampInt(o.v, 0, 999, 0), g: t(o.g, 24) };
+}
+
+/**
+ * @param {{onAd?:(ad:object, peerId:string)=>void, getAd?:()=>(string|null), joinImpl?:Function}} o
+ *   getAd: JSON string of this host's advert, or null when it should not be advertised right now.
+ * @returns {Promise<{stop():void, status():{open:number,total:number,text:string}}>}
+ */
+export async function lobbyJoin(o = {}) {
+  let impls; const mods = [];
+  if (o.joinImpl) impls = [['test', o.joinImpl]];
+  else {
+    impls = []; const errs = [];
+    await Promise.all(STRATEGIES.map(async ([name, load]) => { try { const mod = await load(); impls.push([name, mod.joinRoom]); mods.push([name, mod]); } catch (e) { errs.push(name + ': ' + (e && e.message ? e.message : e)); } }));
+    if (!impls.length) throw new Error(errs.join('; ') || 'nenhuma rede disponível');
+  }
+  const cfg = { appId: ROOM_APP_ID, password: 'hz-public-lobby', turnConfig: TURN_SERVERS, relayConfig: { warnOnRelayFailure: false } };
+  const rooms = [], sends = [];
+  const quiet = (r) => { if (r && r.catch) r.catch(() => {}); };
+  for (const [name, joinRoom] of impls) {
+    try {
+      const room = joinRoom(cfg, LOBBY_ROOM), act = room.makeAction('ad'), idx = rooms.length; rooms.push(room);
+      sends[idx] = (d, id) => quiet(act.send(d, id ? { target: id } : {}));
+      act.onMessage = (d, ctx) => { if (typeof d !== 'string' || d.length > 600 || !o.onAd) return; try { const ad = sanitizeAd(JSON.parse(d)); if (ad && ad.v === PROTO) o.onAd(ad, ctx && ctx.peerId !== undefined ? ctx.peerId : ctx); } catch { /* ignore junk */ } };
+      room.onPeerJoin = (id) => { if (o.getAd) { const a = o.getAd(); if (a) sends[idx](a, id); } };
+      void name;
+    } catch (e) { console.warn('[HZ] lobby', name, 'failed:', e); }
+  }
+  if (!rooms.length) throw new Error('sem rede de salas públicas');
+  const beat = () => { if (!o.getAd) return; const a = o.getAd(); if (a) for (const f of sends) f(a); };
+  const iv = o.getAd ? setInterval(beat, 5000) : 0; if (o.getAd) setTimeout(beat, 1500);
+  return {
+    stop() { clearInterval(iv); for (const r of rooms) { try { r.leave(); } catch { /* ignore */ } } rooms.length = 0; },
+    status() {
+      let open = 0, total = 0; const parts = [], label = { nostr: 'Nostr', torrent: 'Torrent', mqtt: 'MQTT' };
+      for (const [name, mod] of mods) { let a = 0, t = 0; try { const socks = mod.getRelaySockets ? mod.getRelaySockets() : {}; for (const k of Object.keys(socks)) { const x = socks[k]; t++; if (x && (x.readyState === 1 || x.connected === true)) a++; } } catch { /* ignore */ } open += a; total += t; parts.push((label[name] || name) + ' ' + a + '/' + t); }
+      return { open, total, text: parts.join(' · ') };
+    },
+  };
 }

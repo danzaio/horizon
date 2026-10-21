@@ -18,3 +18,11 @@
 * 🔗 (barra, ou botão grande no painel `O`): abre o domo e **copia o link** — o amigo só abre o link e entra no seu mundo (`?join=CÓDIGO`, tenta por até ~2 min).
 * 🧭: teleporta até o amigo mais próximo.
 * Rendezvous por Nostr + BitTorrent + MQTT ao mesmo tempo e TURN público de fallback (CGNAT/NAT simétrico). O painel mostra quantos relays estão realmente conectados.
+
+## Minimapa (`src/features/minimap/`)
+Mapa redondo no canto superior direito: terreno analítico (mostra até terra ainda não carregada), cores por bioma/planeta, relevo sombreado, água por profundidade. Marcadores: você (seta), amigos (cor deles), monstros da horda (vermelho/rosa), sua nave (losango ciano), pontos nas bordas quando fora do alcance. Botões `+` `−` (ou teclas `=` / `-`) mudam o zoom (1–8 blocos por célula), ⌖ alterna "direção do olhar para cima" / "norte fixo", `\` esconde/mostra. Células em cache preenchidas aos poucos (90/160/280 por quadro conforme a qualidade). A barra de botões desceu e quebra em colunas.
+
+## Salas públicas
+* **Ver:** menu inicial → "🌍 Salas públicas": lista nome, dono, tipo de planeta e jogadores (n/8); "Entrar" abre o fluxo normal de entrada por código.
+* **Listar a sua:** no painel Online (`O`), modo **Aberto** → "🌍 Listar na lista pública" (nome editável). Só aparece enquanto o domo está Aberto; "Remover da lista" desfaz; fechar o domo também.
+* Como funciona sem servidor: uma sala Trystero fixa ("lobby", mesmas redes Nostr/Torrent/MQTT do convite); hosts anunciam `{código, nome, dono, tipo, n/max}` a cada 5 s, o navegador de salas coleta (expira em 20 s). Dados sanitizados (`sanitizeAd`). API: `net.setPublic(on, nome)`, `lobbyJoin({onAd,getAd})`.

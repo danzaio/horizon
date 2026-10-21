@@ -3,6 +3,7 @@ import { defineFeature } from '../registry.js';
 import { Net, canHost, NO_HOST_TEXT } from './net.js';
 import { Avatars } from './avatars.js';
 import { openJoinPanel } from './ui-join.js';
+import { openLobbyPanel } from './ui-lobby.js';
 import { createFollow } from './follow.js';
 import { openNetPanel, createChatHud, createStatsLine, showClosed } from './ui-game.js';
 import { parseJoin } from './protocol.js';
@@ -15,6 +16,7 @@ export default defineFeature({
 
   menu(api) {
     api.ui.addMenuButton({ label: 'Entrar em um planeta', hint: 'Jogar no planeta de um amigo (código ou link)', onClick: () => openJoinPanel(api) });
+    api.ui.addMenuButton({ label: '🌍 Salas públicas', hint: 'Ver e entrar em mundos abertos agora', onClick: () => openLobbyPanel(api) });
     let j = null; try { j = new URLSearchParams(location.search).get('join'); } catch { /* no location */ }
     if (j && parseJoin(j).kind !== 'bad') setTimeout(() => openJoinPanel(api, j), 0);       // shareable link: ?join=ABCD-EF12
   },

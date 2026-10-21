@@ -57,3 +57,7 @@
 body.touch .nt-hud { bottom: calc(112px + env(safe-area-inset-bottom, 0px)); width: min(360px, 55vw); }
 #net-debug { position: fixed; left: 8px; top: 196px; margin: 0; z-index: 12; pointer-events: none; font: 11.5px/1.35 var(--mono); color: #bfe9ff; padding: 6px 10px; border-radius: 10px; background: rgba(5,8,20,.66); border: 1px solid var(--line); white-space: pre; }
 @media (max-width: 560px) { .nt-dome { grid-template-columns: 1fr; } .nt-perms { grid-template-columns: 1fr; } }
+
+.nt-lobby { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; max-height: 50vh; overflow: auto; }
+.nt-room { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 10px; background: rgba(255,255,255,.05); border: 1px solid var(--line); }
+.nt-rinfo { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .nt-rcount { font-family: var(--mono); opacity: .8; }

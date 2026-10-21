@@ -58,10 +58,20 @@ export function openNetPanel(ctx, net) {
       kids.push(h('h3', { text: 'Convidar' }),
         h('div', { class: 'nt-row' }, h('span', { class: 'nt-code', text: info.code }), copyButton('Copiar código', () => info.code, ui), copyButton('Copiar link', () => info.link, ui)), qrSlot,
         h('p', { class: 'nt-warn', text: 'Código curto: ' + (info.trystero === 'on' ? 'rede pública de sinalização conectada (' + (info.relays || '') + ') — funciona com qualquer amigo.' : info.trystero === 'connecting' ? 'conectando à rede pública de sinalização… ' + (info.relays || '') + ' (se ficar em 0/…, sua rede bloqueia: use o modo manual)' : info.trystero === 'failed' ? 'rede pública indisponível (' + info.trysteroError + '). Use o modo manual abaixo.' : 'rede pública desligada: só abas do mesmo navegador. Use o modo manual para amigos.') }));
+      if (mode === 'open' && can) kids.push(publicBox());
       if (mode === 'invite') kids.push(inviteBox());
       kids.push(manualBox());
     }
     top.replaceChildren(...kids);
+  }
+  function publicBox() {
+    const on = net.isPublic, name = h('input', { type: 'text', maxlength: '32', placeholder: 'Nome da sala', value: net.pubName || ctx.planet.name || '', 'aria-label': 'Nome da sala pública', style: 'flex:1' });
+    const btn = h('button', { class: on ? 'btn danger sm' : 'btn primary sm', type: 'button', text: on ? 'Remover da lista pública' : '🌍 Listar na lista pública', onclick: async () => {
+      btn.disabled = true;
+      try { await net.setPublic(!on, name.value.trim()); ui.toast(!on ? 'Sala listada! Aparece em “Salas públicas” em alguns segundos.' : 'Sala removida da lista'); } catch (e) { ui.toast(e.message || String(e)); }
+      renderTop();
+    } });
+    return h('div', { class: 'nt-steps' }, h('h3', { text: 'Sala pública' }), h('p', { class: 'dim', text: 'Qualquer pessoa vê o nome da sala e pode entrar. Só use se quiser jogar com estranhos.' }), h('div', { class: 'nt-row' }, name, btn));
   }
   let inviteOut = null, manual = null;
   function inviteBox() {
