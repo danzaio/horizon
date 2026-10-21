@@ -40,6 +40,12 @@ export class Combat {
       const r = sp.r + pad, t = slab(ax, ay, az, dx, dy, dz, len, m.x - r, m.y - pad, m.z - r, m.x + r, m.y + sp.h + pad, m.z + r);
       if (t >= 0 && t < bt) { bt = t; kind = 'mob'; ref = m; }
     }
+    const hl = S.ctx.horde && S.ctx.horde.list;
+    if (hl) for (let i = 0; i < hl.length; i++) {
+      const m = hl[i]; if (m.dead) continue;
+      const r = m.r + pad, t = slab(ax, ay, az, dx, dy, dz, len, m.x - r, m.y - pad, m.z - r, m.x + r, m.y + m.h + pad, m.z + r);
+      if (t >= 0 && t < bt) { bt = t; kind = 'mon'; ref = m; }
+    }
     const pl = S.net() && S.net().players;
     if (pl && !(opts && opts.noPlayers)) for (const p of pl.values()) {
       if (!p || !p.pos || p.alive === false) continue;
@@ -111,6 +117,14 @@ export class Combat {
       if (!this._clear(e, tx, ty, tz, dist)) continue;
       this.damageMob(m, damage, tx / dist * knock, tz / dist * knock, 'me'); hits++;
     }
+    const hl = S.ctx.horde && S.ctx.horde.list;
+    if (hl) for (let i = 0; i < hl.length && hits < 3; i++) {
+      const m = hl[i]; if (m.dead) continue;
+      const tx = m.x - e.x, ty = m.y + m.h * 0.5 - e.y, tz = m.z - e.z, dist = Math.hypot(tx, ty, tz);
+      if (dist > reach + m.r || dist < 1e-3) continue;
+      if ((tx * d.x + ty * d.y + tz * d.z) / dist < cosMin - m.r / Math.max(dist, 1)) continue;
+      S.ctx.horde.damage(m, damage, tx / dist * knock, tz / dist * knock, 'me'); hits++;
+    }
     const pl = S.net() && S.net().players;
     if (pl) for (const p of pl.values()) {
       if (hits >= 3 || !p || !p.pos || p.alive === false) continue;
@@ -151,6 +165,7 @@ export class Combat {
     const t = this.sweep(ax, ay, az, dx, dy, dz, len, e.k === K.SNOW ? 0.12 : 0.05, null);
     if (!t) return false;
     const sp = Math.hypot(e.vx, e.vz) || 1, kb = e.kb || 3;
+    if (t.kind === 'mon') { S.ctx.horde.damage(t.ref, e.dmg, e.vx / sp * kb, e.vz / sp * kb, 'me'); return true; }
     if (t.kind === 'mob') {
       this.damageMob(t.ref, e.dmg, e.vx / sp * kb, e.vz / sp * kb, 'me');
       if (e.k === K.SNOW) { S.audio.snowHit(); S.particles().burst(bx, by, bz, [0.95, 0.97, 1], 8, 0.8); }
@@ -241,6 +256,14 @@ export class Combat {
       if (d >= R) continue;
       const f = 1 - d / R; this.damageMob(m, Math.round(f * f * power * 4.5) + 1, dx / Math.max(d, 0.3) * f * (8 + power), dz / Math.max(d, 0.3) * f * (8 + power), 'me');
     }
+    // horde monsters live on the authority: it applies the blast once (guests only play the effect)
+    const hd = S.ctx.horde;
+    if (hd && hd.authority) for (const m of hd.list) {
+      if (m.dead) continue;
+      const dx = m.x - x, dy = m.y + m.h * 0.5 - y, dz = m.z - z, d = Math.hypot(dx, dy, dz);
+      if (d >= R + m.r) continue;
+      const f = Math.max(0, 1 - d / (R + m.r)); hd.damage(m, Math.round(f * f * power * 7) + 2, dx / Math.max(d, 0.3) * f * (10 + power), dz / Math.max(d, 0.3) * f * (10 + power), 'me', 4 + f * 6);
+    }
     // loose entities (primed TNT, blocks, drops) get shoved
     for (const e of S.ents.list) {
       if (!e.on || e.stuck || e.k === K.HELD || e.k === K.ARROW) continue;
@@ -312,6 +335,8 @@ export class Combat {
       const consider = (kind, ref, t, hy) => { if (t < 0 || t > end) return; if (o.pierce) { this._dmgAcc(acc, kind, ref, hy, o, t); hits++; } else if (!best || t < best.t) best = { kind, ref, t, hy }; };
       const mobs = S.ctx.mobs && S.ctx.mobs.list;
       if (mobs) for (let i = 0; i < mobs.length; i++) { const m = mobs[i], sp = MOB[m.sp]; if (!sp) continue; const r = sp.r + 0.08; consider('mob', m, slab(e.x, e.y, e.z, dx, dy, dz, end, m.x - r, m.y - 0.05, m.z - r, m.x + r, m.y + sp.h + 0.05, m.z + r), 0); }
+      const hl = S.ctx.horde && S.ctx.horde.list;
+      if (hl) for (let i = 0; i < hl.length; i++) { const m = hl[i]; if (m.dead) continue; const r = m.r + 0.08; consider('mon', m, slab(e.x, e.y, e.z, dx, dy, dz, end, m.x - r, m.y - 0.05, m.z - r, m.x + r, m.y + m.h + 0.05, m.z + r), 0); }
       const pl = S.net() && S.net().players;
       if (pl) for (const p of pl.values()) { if (!p || !p.pos || p.alive === false) continue; const r = 0.38 + 0.08, t = slab(e.x, e.y, e.z, dx, dy, dz, end, p.pos.x - r, p.pos.y - 0.05, p.pos.z - r, p.pos.x + r, p.pos.y + 1.88, p.pos.z + r); consider('player', p, t, t >= 0 ? e.y + dy * t - p.pos.y : 0); }
       if (best) { this._dmgAcc(acc, best.kind, best.ref, best.hy, o, best.t); hits++; end = best.t; }
@@ -325,6 +350,7 @@ export class Combat {
     for (const a of acc.values()) {
       const kx = a.dx * (o.kb || 3), kz = a.dz * (o.kb || 3);
       if (a.kind === 'mob') this.damageMob(a.ref, a.dmg, kx, kz, 'me');
+      else if (a.kind === 'mon') S.ctx.horde.damage(a.ref, a.dmg, kx, kz, 'me');
       else { this.hitPlayer(a.ref.id, a.dmg, { knockback: { x: kx, y: 2 + (o.kb || 3) * 0.3, z: kz }, weapon: o.weapon, head: a.head }); S.hud.floatText(a.ref.pos.x, a.ref.pos.y + 2.1, a.ref.pos.z, String(Math.round(a.dmg)) + (a.head ? '!' : ''), a.head ? '#ff4a3a' : '#ff8a6a'); }
     }
     return { hits, dist: farthest };

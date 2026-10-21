@@ -92,3 +92,12 @@ src/
 * Geração/malhagem em workers; upload de malhas com orçamento de ms por quadro (`meshUploadMs` do preset).
 * Resolução dinâmica (`renderScale`) e presets *Batata → Ultra* controlam sombras, pós-processamento, nuvens, água, distância e raio de chunks.
 * Teste visual headless: `node scripts/shot.mjs "http://localhost:5173/?autostart=1&quality=low" out.png --ready="window.__hz && window.__hz.ready"`.
+
+
+## Novidades (multiplayer, naves, horda)
+* **Planetas** com endereço (`J` mapa galáctico), **domo** aberto/fechado e **online P2P** por link (🔗) — sem servidor.
+* **Armas PvP** (fuzil, escopeta, lança-mísseis, railgun, granada, mina, marreta, arpão), **dash** (V), wall-jump e ground-pound.
+* **Naves espaciais** (B): 1ª/3ª pessoa, turbo, lasers e mísseis; um pilota e o outro atira como artilheiro.
+* **Horda de monstros** (H): ondas cooperativas estilo Helldivers.
+* **Minigames** editáveis (Y) com regras em JSON e códigos de compartilhar.
+Detalhes em `docs/`.

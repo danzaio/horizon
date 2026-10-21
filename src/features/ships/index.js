@@ -24,7 +24,7 @@ class ShipFeature {
     // our ship (doubles; the mesh is positioned relative to the camera so it stays precise far from the origin)
     this.x = 0; this.y = 0; this.z = 0; this.vx = 0; this.vy = 0; this.vz = 0;
     this.q = new THREE.Quaternion(); this.qa = new THREE.Quaternion(); this.qr = new THREE.Quaternion();
-    this.alive = false; this.piloting = false; this.thr = 0; this.bank = 0; this.boost = 0;
+    this.alive = false; this.piloting = false; this.gun = null; this.thr = 0; this.bank = 0; this.boost = 0;
     this.mode = '3p'; this.camDist = 9; this.cam = new THREE.Vector3(); this.camInit = false;
     this.cd = 0; this.mcd = 0; this.hitCd = 0; this.sendT = 0; this.hudT = 0; this.callCd = 0; this.wing = 0;
     this._e = new THREE.Euler(0, 0, 0, 'YXZ'); this._v = new THREE.Vector3(); this._v2 = new THREE.Vector3(); this._o = new THREE.Vector3(); this._d = new THREE.Vector3();
@@ -109,7 +109,9 @@ class ShipFeature {
   onB() {
     if (this.ctx.state !== 'playing') return;
     if (this.piloting) { this.exit(); return; }
+    if (this.gun) { this.exitGunner(); return; }
     if (this.alive && Math.hypot(this.x - this.player.x, this.z - this.player.z) < 8 && Math.abs(this.y - this.player.y) < 8) { this.board(); return; }
+    for (const [id, r] of this.remote) if (r.k === 1 && Math.hypot(r.x - this.player.x, r.z - this.player.z) < 14 && Math.abs(r.y - this.player.y) < 12) { this.boardGunner(id); return; }
     this.call();
   }
 
@@ -174,14 +176,14 @@ class ShipFeature {
     ctx.audio.jet(0.25 + this.thr * 0.7);
     if (Math.random() < 0.5 + this.thr) { const b = this._v.set(0, 0, 2.9).applyQuaternion(this.q); ctx.interaction.particles.burst(this.x + b.x, this.y + b.y, this.z + b.z, boosting ? [0.5, 0.8, 1] : [1, 0.65, 0.3], 1, 0.5 + this.thr); }
     // --- weapons
-    this._guns(dt, m);
+    this._guns(dt, m, this);
     // --- camera
     this._camera(dt);
     this._hudTick(dt);
     this._netTick(dt);
   }
 
-  _guns(dt, m) {
+  _guns(dt, m, src) {
     const ctx = this.ctx, ir = ctx.itemsRuntime, p = this.player; if (!ir) return;
     const cp = Math.cos(p.pitch), look = this._d.set(-Math.sin(p.yaw) * cp, Math.sin(p.pitch), -Math.cos(p.yaw) * cp);
     // aim point: where the crosshair ray ends (terrain) or 140 blocks out
@@ -190,7 +192,7 @@ class ShipFeature {
     const px = cam.x + look.x * reach, py = cam.y + look.y * reach, pz = cam.z + look.z * reach;
     if (m.breakHeld && this.cd <= 0) {
       this.cd = 0.13; this.wing = 1 - this.wing;
-      const w = this._v.set(this.wing ? 1.75 : -1.75, -0.02, -0.7).applyQuaternion(this.q), ox = this.x + w.x, oy = this.y + w.y, oz = this.z + w.z;
+      const w = this._v.set(this.wing ? 1.75 : -1.75, src === this ? -0.02 : 0.7, -0.7).applyQuaternion(src.q), ox = src.x + w.x, oy = src.y + w.y, oz = src.z + w.z;
       const dx = px - ox, dy = py - oy, dz = pz - oz, l = Math.hypot(dx, dy, dz) || 1;
       ir.eye.set(ox, oy, oz); ir.dir.set(dx / l, dy / l, dz / l);
       ir.combat.hitscan({ range: 200, dmg: 4.5, head: 1, kb: 2, color: [1, 0.25, 0.4], thick: 0.08, weapon: 'laser da nave', from: { x: ox, y: oy, z: oz } });
@@ -198,7 +200,7 @@ class ShipFeature {
     }
     if (m.placeHeld && this.mcd <= 0) {
       this.mcd = 1.0;
-      const n = this._v.set(0, -0.15, -3.2).applyQuaternion(this.q), ox = this.x + n.x, oy = this.y + n.y, oz = this.z + n.z;
+      const n = this._v.set(0, src === this ? -0.15 : 0.6, -3.2).applyQuaternion(src.q), ox = src.x + n.x, oy = src.y + n.y, oz = src.z + n.z;
       const dx = px - ox, dy = py - oy, dz = pz - oz, l = Math.hypot(dx, dy, dz) || 1;
       if (ctx.permissions.can('explode', { by: ctx.identity.id })) { ir.combat.projectile({ kind: 'missile', x: ox, y: oy, z: oz, dx: dx / l, dy: dy / l, dz: dz / l, speed: 70, damage: 0 }); ctx.audio.gun('rocket'); ir.hud.shake(0.01); }
     }
@@ -224,6 +226,45 @@ class ShipFeature {
     // FOV: wide when boosting
     const target = p.fovBase + this.boost * 16; p.fovCur += (target - p.fovCur) * (1 - Math.exp(-6 * dt));
     if (Math.abs(cam.fov - p.fovCur) > 0.02) { cam.fov = p.fovCur; cam.updateProjectionMatrix(); }
+  }
+
+  // ---- gunner seat on somebody else's ship ---------------------------------------------------------------------------
+  boardGunner(id) {
+    const ctx = this.ctx, p = this.player, r = this.remote.get(id); if (!r) return;
+    this.gun = id; p.vx = p.vy = p.vz = 0; p.flying = true; ctx.controls.noDoubleTapFly = true; ctx.interaction.enabled = false;
+    if (ctx.itemsRuntime) ctx.itemsRuntime.suspend();
+    if (this.gr.hand) this.gr.hand.root.visible = false;
+    this.hud.classList.remove('hidden'); this.hud.classList.add('gun'); this.cd = this.mcd = 0.3;
+    const net = ctx.net; if (net && net.broadcast) net.broadcast('ship:g', { to: id, on: 1 });
+    ctx.ui.toast('Você é o artilheiro: mire e atire (clique = laser, botão direito = míssil). B sai.'); ctx.audio.equip();
+  }
+
+  exitGunner(why) {
+    const ctx = this.ctx, p = this.player, r = this.remote.get(this.gun), id = this.gun; if (!id) return;
+    this.gun = null; ctx.controls.noDoubleTapFly = false; ctx.interaction.enabled = true;
+    if (this.gr.hand) this.gr.hand.root.visible = true;
+    this.hud.classList.add('hidden'); this.hud.classList.remove('gun');
+    let gy = r ? this.world.getSurfaceY(Math.floor(r.x), Math.floor(r.z)) + 1.01 : p.y; const near = r && Math.abs(gy - r.y) < 6;
+    if (r) p.teleport(r.x + 2.4, near ? gy : r.y, r.z); p.flying = false; p.pitch = 0;
+    const ir = ctx.itemsRuntime; if (ir) { ir.health.noFall = near ? 1 : 6; ir.health._peak = p.y; }
+    if (!near) p.fallCap = 7, setTimeout(() => { p.fallCap = 0; }, 9000);                          // emergency chute if you jump out in mid-air
+    const net = ctx.net; if (net && net.broadcast) net.broadcast('ship:g', { to: id, on: 0 });
+    if (why) ctx.ui.toast(why);
+  }
+
+  gunnerStep(dt) {
+    const ctx = this.ctx, p = this.player, r = this.remote.get(this.gun), ir = ctx.itemsRuntime, m = ctx.controls.mouse;
+    dt = Math.min(dt, 0.1);
+    if (!r || r.k === 0 || performance.now() - r.seen > 3000) { this.exitGunner('A nave pousou — você desembarcou'); return; }
+    if (ir && !ir.health.alive) { this.exitGunner(); return; }
+    if (this.cd > 0) this.cd -= dt; if (this.mcd > 0) this.mcd -= dt;
+    m.placePressed = false; m.pickPressed = false;
+    p.x = r.x; p.y = r.y - 0.9; p.z = r.z; p.vx = p.vy = p.vz = 0; p.onGround = false; p.flying = true;
+    if (ir) { ir.health._peak = p.y; ir.health.noFall = Math.max(ir.health.noFall, 0.3); }
+    const c = this._v.set(0, 1.5, 0.5).applyQuaternion(r.q), cam = this.camera;
+    cam.position.set(r.x + c.x, r.y + c.y, r.z + c.z); cam.rotation.set(p.pitch, p.yaw, 0, 'YXZ');
+    if (Math.abs(cam.fov - p.fovBase) > 0.02) { p.fovCur += (p.fovBase - p.fovCur) * (1 - Math.exp(-6 * dt)); cam.fov = p.fovCur; cam.updateProjectionMatrix(); }
+    this._guns(dt, m, r);
   }
 
   // ---- rendering helpers -------------------------------------------------------------------------------------------
@@ -273,17 +314,17 @@ class ShipFeature {
     if (!r) {
       const col = typeof d.c === 'string' && /^#[0-9a-f]{6}$/i.test(d.c) ? d.c : '#ff8fd0', mat = makeShipMaterial(this.gr.shared, col), mesh = new THREE.Mesh(this.geo, mat);
       mesh.frustumCulled = false; this.gr.scene.add(mesh); if (this._post === false) { mat.defines = { NO_POST: 1 }; }
-      r = { mesh, mat, x: tx, y: ty, z: tz, tx, ty, tz, q: new THREE.Quaternion(), tq: new THREE.Quaternion(), thr: 0, seen: 0 }; this.remote.set(id, r);
+      r = { mesh, mat, x: tx, y: ty, z: tz, tx, ty, tz, q: new THREE.Quaternion(), tq: new THREE.Quaternion(), thr: 0, seen: 0, k: 0 }; this.remote.set(id, r);
     }
     r.tx = tx; r.ty = ty; r.tz = tz; r.tq.set(num(d.q[0], 0, -1, 1), num(d.q[1], 0, -1, 1), num(d.q[2], 0, -1, 1), num(d.q[3], 1, -1, 1)).normalize();
-    r.thr = num(d.t, 0, 0, 1); r.seen = performance.now();
+    r.thr = num(d.t, 0, 0, 1); r.k = d.k ? 1 : 0; r.seen = performance.now();
     if (Math.hypot(r.x - tx, r.z - tz) > 80) { r.x = tx; r.y = ty; r.z = tz; r.q.copy(r.tq); }
   }
 
   dispose() {
     this.hud.remove(); this.gr.scene.remove(this.mesh); this.geo.dispose(); this.mat.dispose();
     for (const r of this.remote.values()) { this.gr.scene.remove(r.mesh); r.mat.dispose(); }
-    if (this.piloting) { this.ctx.interaction.enabled = true; this.ctx.controls.noDoubleTapFly = false; }
+    if (this.piloting || this.gun) { this.ctx.interaction.enabled = true; this.ctx.controls.noDoubleTapFly = false; }
   }
 }
 
@@ -294,7 +335,7 @@ export default defineFeature({
     S = new ShipFeature(ctx);
     // the pilot drives the camera inside player.update so the world streams around the final camera position
     const orig = ctx.player.update.bind(ctx.player);
-    ctx.player.update = (dt) => { if (S && S.piloting) S.pilot(dt); else orig(dt); };
+    ctx.player.update = (dt) => { if (S && S.piloting) S.pilot(dt); else if (S && S.gun) S.gunnerStep(dt); else orig(dt); };
     ctx.addHotkey('KeyB', () => S.onB());
     ctx.addHotkey('KeyZ', () => { if (S.piloting) S.toggleCamera(); });
     ctx.ui.addToolbarButton({ id: 'ship', icon: '🚀', title: 'Nave (chamar / embarcar / sair)', key: 'B', onClick: () => S.onB() });
@@ -308,7 +349,7 @@ export default defineFeature({
 
   ready(ctx) {
     if (!S) return;
-    const net = ctx.net; if (net && net.on) { net.on('ship:s', (d, from) => S.onRemote(d, from)); ctx.events.on('net:peerJoin', () => S._send(true)); }
+    const net = ctx.net; if (net && net.on) { net.on('ship:s', (d, from) => S.onRemote(d, from)); net.on('ship:g', (d, from) => { if (d && d.to === net.localId && S.piloting) { const pl = net.players && net.players.get(from); ctx.ui.toast(d.on ? '🔫 ' + (pl ? pl.name : 'Um amigo') + ' embarcou como artilheiro' : 'O artilheiro saiu da nave'); } }); ctx.events.on('net:peerJoin', () => S._send(true)); }
     let arrive = false; try { arrive = sessionStorage.getItem('horizon.ship.arrive') === '1'; sessionStorage.removeItem('horizon.ship.arrive'); } catch { /* ignore */ }
     if (arrive && ctx.role === 'solo') {
       const p = ctx.player; S.x = p.x; S.z = p.z; S.y = Math.min(p.y + 40, 150); S.q.setFromEuler(new THREE.Euler(0, p.yaw, 0, 'YXZ')); S.alive = true; S.mesh.visible = true;

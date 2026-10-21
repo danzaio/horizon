@@ -12,7 +12,7 @@ export function connectByCode(room, onStatus) {
   const tries = [];
   tries.push(localAvailable() ? localConnect(room, 1800) : Promise.reject(new Error('local')));
   const useT = rtcAvailable() && urlFlag('nettrystero') !== '0';
-  if (useT) { onStatus('Procurando o anfitrião na rede pública…'); tries.push(trysteroConnect(room, 25000)); }
+  if (useT) { onStatus('Procurando o anfitrião na rede pública…'); tries.push(trysteroConnect(room, 40000)); }
   return new Promise((resolve, reject) => {
     let won = false, left = tries.length, lastErr = null;
     for (const p of tries) p.then((tr) => { if (won) { tr.close('lost-race'); return; } won = true; resolve(tr); }, (e) => {
@@ -49,7 +49,14 @@ export function openJoinPanel(api, prefill) {
     if (p.kind === 'manual') { manualBox.open = true; manualIn.value = p.code; manualBtn.click(); return; }
     busy = true; go.disabled = true; say('Procurando o anfitrião…');
     const net = new Net(api.events, api.identity);
-    try { const tr = await connectByCode(p.room, say); cur = tr; await finish(net, tr, p.token, 25000, p.room); } catch (e) { say(e.message || String(e), 'err'); busy = false; go.disabled = false; }
+    try {
+      let tr = null, lastErr = null;
+      for (let attempt = 1; attempt <= 3 && !tr; attempt++) {     // the host may still be reaching the public relays: keep looking for ~2 min
+        try { tr = await connectByCode(p.room, say); } catch (e) { lastErr = e; if (attempt < 3) say('Ainda procurando o anfitrião… (tentativa ' + (attempt + 1) + '/3) — ele precisa estar com o jogo aberto.'); }
+      }
+      if (!tr) throw lastErr || new Error('Anfitrião não encontrado.');
+      cur = tr; await finish(net, tr, p.token, 25000, p.room);
+    } catch (e) { say((e.message || String(e)) + ' Dica: peça ao amigo para clicar em 🔗 de novo e mandar o link novo, ou use o modo manual.', 'err'); busy = false; go.disabled = false; }
   }
   go.addEventListener('click', start);
   code.addEventListener('keydown', (e) => { if (e.key === 'Enter') start(); });

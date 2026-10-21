@@ -1,6 +1,6 @@
 // Feature "net": peer-to-peer multiplayer without servers (see docs/NET.md). Publishes ctx.net and ctx.dome (never null after init).
 import { defineFeature } from '../registry.js';
-import { Net } from './net.js';
+import { Net, canHost, NO_HOST_TEXT } from './net.js';
 import { Avatars } from './avatars.js';
 import { openJoinPanel } from './ui-join.js';
 import { createFollow } from './follow.js';
@@ -26,6 +26,24 @@ export default defineFeature({
     const open = () => openNetPanel(ctx, net);
     ctx.ui.addToolbarButton({ id: 'net', icon: '🌐', title: 'Online / domo', key: 'O', onClick: open });
     ctx.addHotkey('KeyO', open);
+    // one-click social buttons: 🔗 opens the dome and copies a link (the friend just opens it) · 🧭 teleports to a friend
+    const invite = async () => {
+      if (net.role === 'guest') { ctx.ui.toast('Só o dono do planeta gera convites'); return; }
+      if (!canHost()) { ctx.ui.toast(NO_HOST_TEXT); return; }
+      if (net.dome.mode === 'closed') net.dome.set('open');
+      for (let i = 0; i < 20 && !(net.hostInfo && net.hostInfo.link); i++) await new Promise((r) => setTimeout(r, 100));
+      const l = net.hostInfo && net.hostInfo.link; if (!l) { ctx.ui.toast('Não consegui abrir o domo agora'); return; }
+      try { await navigator.clipboard.writeText(l); ctx.ui.toast('🔗 Link copiado! Mande para o seu amigo: ele só precisa abrir. (Deixe esta aba aberta.)'); } catch { ctx.ui.toast('Link: ' + l, 9000); }
+    };
+    const gotoFriend = () => {
+      const list = [...net.players.values()].filter((p) => p.hasPos);
+      if (!list.length) { ctx.ui.toast(net.players.size ? 'Aguardando a posição do amigo…' : 'Ninguém online ainda — use 🔗 para convidar'); return; }
+      const pl = ctx.player; list.sort((a, b) => Math.hypot(a.pos.x - pl.x, a.pos.z - pl.z) - Math.hypot(b.pos.x - pl.x, b.pos.z - pl.z));
+      const t = list[0]; ctx.player.teleport(t.pos.x + 1.4, t.pos.y + 0.3, t.pos.z); ctx.ui.toast('Teleportado até ' + t.name);
+    };
+    net.inviteLink = invite; net.gotoFriend = gotoFriend;
+    ctx.ui.addToolbarButton({ id: 'invite', icon: '🔗', title: 'Convidar amigo (copia o link)', onClick: invite });
+    ctx.ui.addToolbarButton({ id: 'goto', icon: '🧭', title: 'Ir até o amigo', onClick: gotoFriend });
     S.chat = createChatHud(ctx, net); S.stats = createStatsLine(ctx, net); S.follow = net.spectate = createFollow(ctx, net);
     S.offs.push(
       ctx.events.on('net:role', (e) => { ctx.role = e.role; ctx.ui.setPlanetBadge(badge(ctx, net)); }),

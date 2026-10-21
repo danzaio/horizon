@@ -1,0 +1,11 @@
+#hz-horde-hud { position: fixed; left: 50%; top: 10px; transform: translateX(-50%); z-index: 6; pointer-events: none; text-align: center; font-family: ui-monospace, Menlo, Consolas, monospace; color: #e8ffe0; text-shadow: 0 0 8px rgba(80,255,80,.5); min-width: 260px; }
+#hz-horde-hud.hidden { display: none; }
+.hd-top { display: flex; gap: 14px; justify-content: center; align-items: baseline; background: rgba(8,16,8,.55); border: 1px solid rgba(120,255,120,.35); border-radius: 8px; padding: 5px 14px; }
+.hd-top b { font-size: 18px; letter-spacing: 2px; color: #b8ff8a; }
+.hd-bar { height: 4px; margin-top: 4px; border-radius: 2px; background: rgba(0,0,0,.45); overflow: hidden; }
+.hd-bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #5be04a, #d6ff6a); transition: width .3s; }
+.hd-banner { margin-top: 22vh; font-size: 40px; font-weight: 800; letter-spacing: 6px; opacity: 0; transform: scale(.9); transition: opacity .35s, transform .35s; text-shadow: 0 0 18px rgba(120,255,90,.8), 0 2px 0 #000; white-space: nowrap; }
+.hd-banner.on { opacity: 1; transform: scale(1); }
+.hd-panel p { line-height: 1.45; } .hd-panel label { display: block; margin: 10px 0; } .hd-panel select { margin-left: 8px; }
+.hd-btns { display: flex; gap: 8px; margin-top: 6px; } .hd-st { opacity: .8; margin-top: 8px; }
+@media (max-width: 700px) { .hd-banner { font-size: 24px; letter-spacing: 3px; } }
