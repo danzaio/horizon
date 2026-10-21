@@ -60,8 +60,8 @@ await t('tampered / truncated / bomb codes fail cleanly', async () => {
 });
 
 console.log('templates');
-await t('all 8 templates validate with no warnings and lint clean', () => {
-  assert.equal(Object.keys(tpl).length, 8);
+await t('all 12 templates validate with no warnings and lint clean', () => {
+  assert.equal(Object.keys(tpl).length, 12);
   for (const x of Object.values(tpl)) { assert.ok(x.def.entities.length > 1, x.id); assert.ok(x.def.arena.length > 0 || x.def.entities.some((e) => e.type === 'area'), x.id); assert.deepEqual(lintGameDef(x.def), [], x.id); }
 });
 

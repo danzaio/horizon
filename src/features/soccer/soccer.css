@@ -1,0 +1,10 @@
+#hz-soccer-hud { position: fixed; inset: 0; pointer-events: none; z-index: 6; font-family: ui-monospace, Menlo, Consolas, monospace; color: #fff; }
+#hz-soccer-hud.hidden { display: none; }
+.sc-top { position: absolute; left: 50%; top: 10px; transform: translateX(-50%); display: flex; gap: 14px; align-items: center; background: rgba(8,12,20,.65); border: 1px solid rgba(255,255,255,.25); border-radius: 10px; padding: 6px 16px; }
+.sc-top .sc-s { font-size: 24px; letter-spacing: 3px; } .sc-top em { font-style: normal; opacity: .85; min-width: 52px; text-align: right; }
+.sc-banner { position: absolute; left: 0; right: 0; top: 22vh; text-align: center; font-size: 42px; font-weight: 800; letter-spacing: 4px; opacity: 0; transition: opacity .3s; text-shadow: 0 0 18px rgba(255,255,255,.7), 0 2px 0 #000; }
+.sc-banner.on { opacity: 1; }
+.sc-hint { position: absolute; left: 50%; bottom: 150px; transform: translateX(-50%); font-size: 12px; opacity: .75; background: rgba(0,0,0,.35); padding: 3px 10px; border-radius: 6px; }
+.sc-hint kbd { background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.25); border-radius: 4px; padding: 0 4px; }
+.sc-panel p { line-height: 1.45; } .sc-btns { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+@media (max-width: 700px) { .sc-banner { font-size: 26px; } }
