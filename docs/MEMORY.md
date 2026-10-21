@@ -34,6 +34,11 @@ Hospedagem estática (github.io), P2P, sem servidor nosso, roda em hardware bata
 Docs: `docs/CONTRACT2.md` (contrato), `NET.md`, `ITEMS.md`, `MINIGAMES.md`, `PLANETS.md`, `SHIPS_HORDE.md` (naves, horda, carro, futebol, minimapa, salas, bichinhos).
 Block ids: G 51–69 (TNT=51), M 70–89.
 
+## /luta/ — Guitar Briga III (jogo de luta satírico, página separada)
+- Sátira Lula × Flávio no estilo Guitar Hero III; luta em **3D (Three.js, toon + hachura)**, título/VS em 2D. Código só em `luta/` (`index.html`, `src/main.js` lógica+HUD+telas+áudio, `src/three/{stage,rocker,toon,extras}.js`, `src/shared.js`); `vite.config.js` é multi-página (index + luta); extras: `vite.luta.config.js` (`npm run build:luta` → HTML único), `scripts/luta-online.sh`. Link: https://danzaio.github.io/horizon/luta/ (README tem controles e golpes). Não mexe no mundo de voxels.
+- Mecânicas: 1P/2P, melhor de 3, defesa (botão segurar `Q`/DEFESA), 2 especiais por lutador (ESP 1 `R`, ESP 2 `E`; ¼ do star power), pesado, SOLO (mini Guitar Hero, star power cheio), torcidas (Exército do Lula/Janones "EXPLODE!!!", Tropa do Flávio/Nikolas "Chupetinha") com medidor, participações aleatórias (Zé Gotinha → vacina; Vorcaro → CDB), pato inflável.
+- Celular: joystick flutuante + botões com o nome real do golpe, UI do solo com 3 trilhas, aviso de retrato, COMO JOGAR (aparece 1x). Testes: `?scene=title|mode|select|vs|fight|result|help&mode=1|2&mute=1` e `window.__gb` (`game`, `step(n)`, `startSolo`, `r3`); partidas headless por teclado/toque sem erros. Pendência: FPS real em celular fraco não medido (~620 draw calls); feedback do usuário: "mecânicas meio misturadas" (perguntado quais; barras star power/torcida, itens e participações ainda podem ser simplificados).
+
 ## Testes (rodar antes de publicar)
 `node src/features/{universe/address,universe/generator,minigame/minigame,critters/battle}.test.mjs` · `node scripts/nettest-unit.mjs` · `node src/game/{Player,AutoQuality}.test.mjs` · e2e: `node scripts/nettest.mjs --url=http://127.0.0.1:5320` (96 checks) · screenshots `scripts/shot.mjs`. Só WebGL por software (SwiftShader): FPS real não mensurável. Playwright resolve a partir do projeto (scripts em `scripts/` ou import por caminho absoluto de `node_modules/playwright-core`).
 
@@ -121,3 +126,4 @@ Block ids: G 51–69 (TNT=51), M 70–89.
 - 00:55 — **Bichinhos (critters)**: 38 espécies, selvagens por bioma, cápsulas, grupo/caixa/dex (N), batalha selvagem + PvP determinística (testado 2 navegadores). battle.test 8/8. Todas as tarefas pedidas até aqui entregues; pendente: balanceamento, sons, mais minigames, testar online real.
 - 01:00 — hotkey I abre o painel de Futebol.
 - 01:05 — Memória reescrita (topo consolidado: visão, regras, publicação, mapa de features, testes, pendências).
+- 23:25 — **/luta/ (Guitar Briga III):** controles de celular refeitos (joystick + botões rotulados, DEFESA e ESP 2 com botão/tecla próprios, solo com 3 trilhas, aviso de retrato, tela COMO JOGAR). PR #2 mergeado a pedido do usuário.
