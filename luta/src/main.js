@@ -150,6 +150,10 @@ const audio = {
         for (let i = 0; i < 4; i++) { const w = t + rnd(0.1, 1.2); this.tone(w, 'sine', rnd(1800, 2600), rnd(2600, 3400), rnd(0.15, 0.35), 0.05 * v); }
         break;
       }
+      case 'coin': this.tone(t, 'square', 988, 988, 0.06, 0.12 * v); this.tone(t + 0.06, 'square', 1319, 1319, 0.12, 0.12 * v); break;
+      case 'kaching': this.noiseHit(t, 0.08, 5000, 2, 0.4 * v); this.tone(t + 0.05, 'triangle', 1568, 1568, 0.5, 0.25 * v); this.tone(t + 0.05, 'triangle', 2093, 2093, 0.5, 0.18 * v); break;
+      case 'heal': [523, 659, 784, 1047].forEach((f, i) => this.tone(t + i * 0.07, 'sine', f, f, 0.25, 0.22 * v)); break;
+      case 'jingle': [784, 659, 784, 988, 880, 988, 1175].forEach((f, i) => this.tone(t + i * 0.11, 'triangle', f, f, 0.18, 0.2 * v)); break;
       case 'boo': {
         const f = this.noiseHit(t, 0.9, 300, 0.8, 0.18 * v, 'lowpass');
         this.tone(t, 'sawtooth', 140, 110, 0.8, 0.05 * v); break;
@@ -242,8 +246,8 @@ const CHARS = {
     boot: '#f4f4f0', bootS: '#b9bcc4',
     guitar: 'x', gtrCol: '#0e9a48', gtrColS: '#05592a', gtrGuard: '#ffd21a',
     accent: '#ffd21a', accent2: '#0e9a48', bg: ['#063d1f', '#0e9a48'],
-    proj: 'bola', projName: 'BOLA ZERO UM', proj2: 'bola_baixa', proj2Name: 'BOLA RASTEIRA', heavy: 'guitar', superName: 'SOLO ZERO UM',
-    moves: ['R: BOLA ZERO UM', '↓+R: BOLA RASTEIRA', 'H: GUITARRADA'],
+    proj: 'bola', projName: 'BOLA ZERO UM', proj2: 'lulinha', proj2Name: 'E O LULINHA?', heavy: 'guitar', superName: 'SOLO ZERO UM',
+    moves: ['R: BOLA ZERO UM', '↓+R: E O LULINHA?', 'H: GUITARRADA'],
     stats: [['FORÇA', 4], ['VELOCIDADE', 5], ['CARISMA', 3]],
     quotes: ['Zero Um no placar, zero chance pra você!', 'Isso aqui é rock carioca, mermão!', 'Pode pedir música que hoje o show é meu!'],
     taunts: ['ZERO UM!', 'MERMÃO!', 'GOOOL!'],
@@ -801,6 +805,7 @@ function updateParts() {
     else if (p.t === 'ring') p.r += 9;
     else if (p.t === 'pop') p.y -= 0.6;
     else if (p.t === 'conf') { p.x += p.vx; p.y += p.vy; p.vy = Math.min(p.vy + 0.15, 3); p.rot += p.vr; p.vx *= 0.99; }
+    else if (p.t === 'qmark') { p.a += 0.09; p.x = p.owner.x + Math.cos(p.a) * 60; p.y = p.owner.y - 330 + Math.sin(p.a) * 16 - (p.max - p.life) * 0.2; }
     else if (p.t === 'paper') { p.x += p.vx + Math.sin(p.life * 0.15) * 1.2; p.y += p.vy; p.vy = Math.min(p.vy + 0.32, 2.2); p.rot += p.vr; p.vx *= 0.96; }
   }
   parts = parts.filter(p => p.life > 0);
@@ -808,16 +813,21 @@ function updateParts() {
   bolts = bolts.filter(b => b.life > 0);
 }
 function starburst(c, r1, r2, n) { c.beginPath(); for (let i = 0; i < n * 2; i++) { const r = i % 2 ? r2 : r1, a = i / (n * 2) * TAU; c.lineTo(Math.cos(a) * r, Math.sin(a) * r); } c.closePath(); }
-function drawSigilo(c) {
+const BALLOONS = {
+  sigilo: { lines: ['LIBERA O SIGILO', 'BANCÁRIO!'], sizes: [30, 36], col: '#ff3030' },
+  lulinha: { lines: ['E O', 'LULINHA?'], sizes: [34, 46], col: '#0e9a48' },
+};
+function drawBalloons(c) {
   for (const p of projs) {
-    if (p.kind !== 'sigilo') continue;
+    const B = BALLOONS[p.kind];
+    if (!B) continue;
     const wob = 1 + Math.sin(game.t * 0.4) * 0.05, dir = Math.sign(p.vx);
     c.save(); c.translate(p.x, p.y); c.scale(wob, wob); c.rotate(Math.sin(game.t * 0.15) * 0.06);
     c.beginPath(); c.ellipse(0, 0, 112, 64, 0, 0, TAU);
     c.moveTo(-dir * 60, 40); c.lineTo(-dir * 120, 92); c.lineTo(-dir * 20, 56);
     inked(c, '#fffdf2', 6);
-    comicText(c, 'LIBERA O SIGILO', 0, -16, 30, '#ffffff', '#ff3030', 'center', 6);
-    comicText(c, 'BANCÁRIO!', 0, 20, 36, '#ffffff', '#ff3030', 'center', 6);
+    comicText(c, B.lines[0], 0, -16, B.sizes[0], '#ffffff', B.col, 'center', 6);
+    comicText(c, B.lines[1], 0, 20, B.sizes[1], '#ffffff', B.col, 'center', 6);
     c.restore();
   }
 }
@@ -840,6 +850,7 @@ function drawParts(c) {
   c.restore();
   for (const p of parts) {
     if (p.t === 'conf') { c.save(); c.translate(p.x, p.y); c.rotate(p.rot); c.fillStyle = p.col; c.fillRect(-5, -3, 10, 6); c.restore(); }
+    if (p.t === 'qmark') { c.save(); c.globalAlpha = clamp(p.life / 20, 0, 1); comicText(c, '?', p.x, p.y, p.size, '#ffffff', '#ffd21a'); c.restore(); }
     if (p.t === 'paper') { // bank statements fluttering out
       c.save(); c.translate(p.x, p.y); c.rotate(p.rot); c.scale(1, Math.cos(p.life * 0.2));
       c.fillStyle = '#fbf8ee'; c.fillRect(-11, -14, 22, 28); c.lineWidth = 1.5; c.strokeStyle = OUT; c.strokeRect(-11, -14, 22, 28);
@@ -1077,6 +1088,10 @@ function tryHit(att, def, mv, x0, y0, x1, y1, isProj) {
     pop('SIGILO QUEBRADO!', cx, cy - 90, '#ff3030', 66);
     for (let i = 0; i < 34; i++) parts.push({ t: 'paper', x: cx + rnd(-20, 20), y: cy + rnd(-30, 10), vx: rnd(-7, 7), vy: rnd(-13, -4), rot: rnd(0, TAU), vr: rnd(-0.25, 0.25), life: rnd(90, 140), max: 140 });
   }
+  else if (isProj && isProj.kind === 'lulinha') {
+    pop('MUDOU DE ASSUNTO!', cx, cy - 90, '#ffd21a', 62);
+    for (let i = 0; i < 9; i++) parts.push({ t: 'qmark', x: def.x, y: def.y - 320, a: i / 9 * TAU, life: 110, max: 110, size: rnd(26, 40), owner: def });
+  }
   else if (isProj) pop(isProj.kind === 'foice' ? 'ZÁS!' : 'GOOOL!', cx, cy - 50, isProj.kind === 'foice' ? '#ff3030' : '#2bff5a', 58);
   else if (def.combo >= 3) pop(def.combo + ' HITS!', cx, cy - 70, '#29d8ff', 56);
   else if (Math.random() < 0.18) pop(['POW!', 'TUM!', 'PÁ!', 'BAM!'][irnd(4)], cx, cy - 50, '#ffd400', 50);
@@ -1089,23 +1104,24 @@ const PROJ = {
   foice: { y: 195, vx: 10, r: 28, mv: { dmg: 9, kb: 7, stun: 18, bstun: 12, meter: 8, sfx: 'boom', chip: 2 } },
   sigilo: { y: 215, vx: 6.5, r: 40, mv: { dmg: 7, kb: 3, stun: 42, bstun: 14, meter: 10, sfx: 'boom', chip: 1.5 } },
   bola: { y: 190, vx: 11, r: 24, mv: { dmg: 9, kb: 7, stun: 18, bstun: 12, meter: 8, sfx: 'boom', chip: 2 } },
-  bola_baixa: { y: 30, vx: 9.5, r: 24, mv: { dmg: 8, kb: 6, stun: 20, bstun: 12, meter: 8, sfx: 'boom', chip: 2, low: true } },
+  lulinha: { y: 215, vx: 6.5, r: 40, mv: { dmg: 7, kb: 3, stun: 42, bstun: 14, meter: 10, sfx: 'boom', chip: 1.5 } },
 };
 function spawnProj(f, variant) {
   const kind = variant === 2 ? f.def.proj2 : f.def.proj, P_ = PROJ[kind];
   projs.push({ owner: f, kind, x: f.x + f.facing * 70, y: f.y - P_.y, vx: f.facing * P_.vx, r: P_.r, mv: P_.mv, rot: 0, life: 200 });
-  audio.sfx(kind === 'sigilo' ? 'cheer' : 'kick', kind === 'sigilo' ? 0.6 : 1);
+  const balloon = kind === 'sigilo' || kind === 'lulinha';
+  audio.sfx(balloon ? 'cheer' : 'kick', balloon ? 0.6 : 1);
   if (kind.startsWith('bola')) ring(f.x + f.facing * 60, f.y - P_.y, '#2bff5a', 10);
-  if (kind === 'sigilo') f.taunt = 50;
+  if (balloon) f.taunt = 50;
   pop(variant === 2 ? f.def.proj2Name : f.def.projName, f.x, f.y - 340, f.def.accent, 34);
 }
 function updateProjs() {
   for (const p of projs) {
     p.x += p.vx; p.life--; p.rot += p.vx * 0.04;
-    const trail = p.kind === 'foice' ? ['#ff3030', '#ffd400'] : p.kind === 'sigilo' ? null : ['#2bff5a', '#ffd21a'];
+    const trail = p.kind === 'foice' ? ['#ff3030', '#ffd400'] : p.kind === 'bola' ? ['#2bff5a', '#ffd21a'] : null;
     if (trail && game.t % 2 === 0) parts.push({ t: 'spark', x: p.x, y: p.y + rnd(-14, 14), vx: -p.vx * 0.3, vy: 0, life: 12, max: 26, col: trail[irnd(2)] });
     const target = p.owner.opp;
-    if (tryHit(p.owner, target, p.mv, p.x - p.r, p.y - p.r, p.x + p.r, p.y + p.r, p)) { p.life = 0; if (p.kind !== 'sigilo') fire(p.x, p.y, 14, 16); }
+    if (tryHit(p.owner, target, p.mv, p.x - p.r, p.y - p.r, p.x + p.r, p.y + p.r, p)) { p.life = 0; if (!trail) ring(p.x, p.y, '#ffffff', 30); else fire(p.x, p.y, 14, 16); }
     if (p.x < -60 || p.x > W + 60) p.life = 0;
   }
   // clash
@@ -1254,6 +1270,8 @@ class AI {
     }
     if (me.state === 'jump' && this.jumpAtk && dist < 140 && me.vy > -4) { pad.K = true; this.jumpAtk = false; return pad; }
     if (!me.canAct()) return pad;
+    const want = items.find(it => (it.kind === 'vacina' && me.hp < 85) || (it.kind === 'cdb' && it.y >= GY - 6 && me.meter < 100));
+    if (want && Math.abs(want.x - me.x) < 420 && this.plan !== 'attack') { pad[want.x > me.x ? 'r' : 'l'] = true; return pad; }
     if (--this.planT <= 0) {
       const r = Math.random();
       if (me.meter >= 100 && dist < 600 && r < 0.6) this.plan = 'super';
@@ -1300,7 +1318,8 @@ function newMatch() {
 }
 function startRound() {
   for (const f of [game.f1, game.f2]) f.reset();
-  projs = []; parts = []; bolts = []; game.solo = null;
+  projs = []; parts = []; bolts = []; items = []; game.solo = null; game.cameo = null;
+  game.nextCameo = 700 + irnd(600); game.cameoN = game.cameoN || irnd(2);
   game.phase = 'intro'; game.phaseT = 0; game.timer = 99; game.timerF = 0; game.hitstop = 0; game.winner = null;
   if (game.round === 1) { game.f1.state = game.f2.state = 'intro'; }
 }
@@ -1352,12 +1371,81 @@ function updateFight() {
       break;
   }
   f1.update(); f2.update();
+  updateCameo(); updateItems();
   // spacing
   if (f1.state !== 'down' && f2.state !== 'down' && Math.abs(f1.y - f2.y) < 140) {
     const dx = f2.x - f1.x, min = 104;
     if (Math.abs(dx) < min) { const push = (min - Math.abs(dx)) / 2 * (dx >= 0 ? 1 : -1); f1.x = clamp(f1.x - push, 70, W - 70); f2.x = clamp(f2.x + push, 70, W - 70); }
   }
   updateProjs();
+}
+// =====================================================================================
+//  PARTICIPAÇÕES ESPECIAIS (random cameos + pickups, for both fighters)
+// =====================================================================================
+let items = [];
+const CAMEOS = {
+  gotinha: { name: 'ZÉ GOTINHA', speed: 5 },
+  vorcaro: { name: 'VORCARO', speed: 6.5 },
+};
+function startCameo() {
+  const kind = ['gotinha', 'vorcaro'][game.cameoN++ % 2], dir = Math.random() < 0.5 ? 1 : -1;
+  game.cameo = { kind, dir, x: dir > 0 ? -90 : W + 90, t: 0, state: 'enter', stopX: rnd(380, 900), pose: copyPose(POSES.idle) };
+  if (kind === 'gotinha') { audio.sfx('jingle'); }
+  else { audio.sfx('kaching'); pop('CDB A 140% DO CDI!', W / 2, 330, '#2bff5a', 46); }
+}
+function updateCameo() {
+  if (game.phase !== 'fight') return;
+  const cm = game.cameo;
+  if (!cm) { if (--game.nextCameo <= 0) { startCameo(); game.nextCameo = 1100 + irnd(700); } return; }
+  cm.t++;
+  const sp = CAMEOS[cm.kind].speed;
+  if (cm.kind === 'gotinha') {
+    if (cm.state === 'enter') { cm.x += cm.dir * sp; if ((cm.x - cm.stopX) * cm.dir >= 0) { cm.state = 'act'; cm.actT = 0; } }
+    else if (cm.state === 'act') {
+      if (++cm.actT === 20) { items.push({ kind: 'vacina', x: cm.x + cm.dir * 40, y: GY - 34, life: 600 }); pop('OLHA A VACINA!', cm.x, GY - 260, '#29d8ff', 46); audio.sfx('heal', 0.6); }
+      if (cm.actT > 70) cm.state = 'exit';
+    } else cm.x += cm.dir * sp * 1.3;
+  } else {
+    cm.x += cm.dir * sp;
+    // run cycle
+    const ph = cm.t * 0.35, P_ = cm.pose;
+    P_.lean = 16 * D; P_.hf = (10 + Math.sin(ph) * 38) * D; P_.hb = (-10 - Math.sin(ph) * 38) * D;
+    P_.kf = (-30 - Math.max(0, Math.cos(ph)) * 60) * D; P_.kb = (-30 - Math.max(0, -Math.cos(ph)) * 60) * D;
+    P_.sf = (20 - Math.sin(ph) * 50) * D; P_.ef = 80 * D; P_.sb = (10 + Math.sin(ph) * 40) * D; P_.eb = 20 * D; P_.head = -6 * D;
+    if (cm.t % 8 === 0 && cm.x > 120 && cm.x < W - 120) { items.push({ kind: 'cdb', x: cm.x, y: GY - 200, vx: rnd(-2.5, 2.5), vy: rnd(-5, -1), rot: rnd(0, TAU), life: 1e9 }); audio.sfx('coin', 0.4); }
+  }
+  if (cm.x < -140 || cm.x > W + 140) {
+    if (cm.kind === 'vorcaro') {
+      pop('BANCO MASTER: LIQUIDADO!', W / 2, 330, '#ff3030', 58); audio.sfx('boo', 1);
+      for (const it of items) if (it.kind === 'cdb') { fire(it.x, it.y, 3, 6, -2); it.life = 0; }
+    }
+    game.cameo = null;
+  }
+}
+function updateItems() {
+  for (const it of items) {
+    it.life--;
+    if (it.kind === 'cdb') {
+      if (it.y < GY - 6) { it.vy = Math.min(it.vy + 0.18, 2); it.x += it.vx + Math.sin(game.t * 0.1 + it.rot) * 0.8; it.y += it.vy; it.vx *= 0.97; it.rot += 0.08; }
+      else it.y = GY - 6;
+    }
+    for (const f of [game.f1, game.f2]) {
+      if (it.life <= 0 || f.state === 'down' || Math.abs(f.x - it.x) > 46 || it.y < f.y - 300) continue;
+      if (it.kind === 'cdb') { f.meter = Math.min(100, f.meter + 6); pop('+CDB', it.x, it.y - 30, '#2bff5a', 26); audio.sfx('coin'); }
+      else { f.hp = Math.min(100, f.hp + 15); spark(it.x, it.y - 40, 18, '#29d8ff', 9); ring(it.x, it.y, '#2bffb0', 30); pop('VACINADO! +15', it.x, it.y - 120, '#29d8ff', 44); audio.sfx('heal'); }
+      it.life = 0;
+    }
+  }
+  items = items.filter(it => it.life > 0);
+}
+function drawItems(c) {
+  for (const it of items) {
+    if (it.kind !== 'cdb') continue;
+    c.save(); c.translate(it.x, it.y); c.rotate(Math.sin(it.rot) * 0.5); c.scale(1, it.y < GY - 6 ? Math.cos(it.rot * 2) : 1);
+    c.fillStyle = '#7fd36a'; c.fillRect(-20, -10, 40, 20); c.lineWidth = 2; c.strokeStyle = OUT; c.strokeRect(-20, -10, 40, 20);
+    c.fillStyle = '#2f7a2a'; c.font = `10px ${FONT}`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('CDB 140%', 0, 0);
+    c.restore();
+  }
 }
 function confetti() {
   const cols = ['#ff3030', '#ffd400', '#2bff5a', '#29b8ff', '#ff2bd6', '#ffffff'];
@@ -1452,15 +1540,24 @@ function renderFight() {
   r3.render({
     mode: 'fight', t: game.t, beat: music.beat, excite: game.excite, dark: !!game.solo, shake: game.shake,
     flash: game.flash, flashPos: game.flashPos, cam: fightCam(), actors: [f1.look(), f2.look()], projs,
+    cameo: game.cameo, items,
   });
   // sparks, fire, comic pops and lightning live on the fight plane: draw them through the camera
   const T = r3.planeTransform((f1.x + f2.x) / 2, 420);
   c.setTransform(T[0] * scale, T[1] * scale, T[2] * scale, T[3] * scale, T[4] * scale, T[5] * scale);
-  drawSigilo(c);
+  drawBalloons(c);
+  drawItems(c);
   drawParts(c);
   c.setTransform(scale, 0, 0, scale, 0, 0);
   if (game.solo) drawSoloOverlay(c);
   drawHUD(c);
+  if (game.cameo && game.cameo.t < 130) {
+    const k = clamp(Math.min(game.cameo.t, 130 - game.cameo.t) / 12, 0, 1);
+    c.save(); c.globalAlpha = k; c.translate(W / 2, 162); c.rotate(-0.02);
+    c.beginPath(); c.moveTo(-250, -22); c.lineTo(260, -26); c.lineTo(250, 22); c.lineTo(-260, 26); c.closePath(); inked(c, '#16060c', 4);
+    comicText(c, 'PARTICIPAÇÃO ESPECIAL: ' + CAMEOS[game.cameo.kind].name, 0, 1, 26, '#ffffff', '#ffd400', 'center', 5);
+    c.restore();
+  }
   // banners
   const pt = game.phaseT;
   if (game.phase === 'intro') {

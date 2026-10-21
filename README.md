@@ -25,11 +25,13 @@ Jogo de luta satírico entre caricaturas do Lula e do Flávio, no estilo de *Gui
 | | Lula "O Barba" | Flávio "Zero Um" |
 |---|---|---|
 | Especial | **Foice e Martelo** (emblema giratório) | **Bola Zero Um** |
-| Especial 2 | **Libera o Sigilo!** (balão que atordoa e espalha extratos bancários) | **Bola Rasteira** (baixa: defenda agachado) |
+| Especial 2 | **Libera o Sigilo!** (balão que atordoa e espalha extratos bancários) | **E o Lulinha?** (balão que deixa o Lula tonto: "MUDOU DE ASSUNTO!") |
 | Pesado | **Martelada** | **Guitarrada** |
 | Super | Solo do Companheiro | Solo Zero Um |
 
-Código em `luta/`: `src/main.js` (lógica, IA, solo, HUD, telas 2D, áudio), `src/three/stage.js` (palco, câmera de luta, luzes, plateia, projéteis), `src/three/rocker.js` (personagens 3D montados com primitivas e texturas pintadas em canvas, guiados pelos mesmos ângulos de pose da lógica; IK nos braços durante o solo), `src/three/toon.js` (materiais toon + hachura + contorno). Para testes: `?scene=title|mode|select|vs|fight|result&mode=1|2&mute=1` e `window.__gb` (`game`, `step(n)`, `startSolo`, `r3`).
+**Participações especiais** (eventos aleatórios no meio do round, valem para os dois): o **Zé Gotinha** entra correndo e deixa uma vacina (+15 de vida para quem pegar); o **Vorcaro** atravessa o palco com a maleta jogando "CDB a 140% do CDI" (cada nota dá star power) até o "BANCO MASTER: LIQUIDADO!" queimar o que sobrou. E um pato amarelo gigante inflável flutua atrás do palco. A CPU também corre atrás dos itens.
+
+Código em `luta/`: `src/main.js` (lógica, IA, solo, HUD, telas 2D, áudio), `src/three/stage.js` (palco, câmera de luta, luzes, plateia, projéteis), `src/three/rocker.js` (personagens 3D montados com primitivas e texturas pintadas em canvas, guiados pelos mesmos ângulos de pose da lógica; IK nos braços durante o solo), `src/three/toon.js` (materiais toon + hachura + contorno), `src/three/extras.js` (Zé Gotinha, vacina, Vorcaro, pato). Para testes: `?scene=title|mode|select|vs|fight|result&mode=1|2&mute=1` e `window.__gb` (`game`, `step(n)`, `startSolo`, `r3`).
 
 ## Rodar
 

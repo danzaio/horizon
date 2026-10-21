@@ -21,9 +21,9 @@ function strokes(g, n, w, h, cols, len, lw, seed = 1) {
     g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x + (R() - 0.5) * 8, y + l / 2, x + (R() - 0.5) * 6, y + l); g.stroke();
   }
 }
-function faceTexture(id) {
+function faceTexture(id, skin) {
   return tex(512, 256, (g, w, h) => {
-    g.fillStyle = id === 'lula' ? '#d99d73' : '#f0c39b'; g.fillRect(0, 0, w, h);
+    g.fillStyle = skin; g.fillRect(0, 0, w, h);
     const blush = g.createRadialGradient(0, 0, 2, 0, 0, 40); blush.addColorStop(0, 'rgba(220,90,80,.35)'); blush.addColorStop(1, 'rgba(220,90,80,0)');
     for (const x of [205, 307]) { g.save(); g.translate(x, 138); g.fillStyle = blush; g.fillRect(-40, -40, 80, 80); g.restore(); }
     if (id === 'lula') {
@@ -154,7 +154,7 @@ export class Rocker {
     this.legF = this.chain(this.rotG, V(2, 0, 13), L.thigh, Wd.thigh / 2, M.pants, L.shin, Wd.shin / 2, M.pants);
     this.boot(this.legB.end); this.boot(this.legF.end);
     this.torso = new THREE.Group(); this.rotG.add(this.torso);
-    def.id === 'lula' ? this.torsoLula() : this.torsoFlavio();
+    ({ lula: this.torsoLula, flavio: this.torsoFlavio }[def.id] || this.torsoSuit).call(this);
     const shY = L.torso * 0.86, shZ = 31;
     this.armB = this.chain(this.torso, V(0, shY, -shZ), L.upper, Wd.upper / 2, M.sleeve, L.fore, Wd.fore / 2, M.fore);
     this.armF = this.chain(this.torso, V(0, shY, shZ), L.upper, Wd.upper / 2, M.sleeve, L.fore, Wd.fore / 2, M.fore);
@@ -164,12 +164,19 @@ export class Rocker {
     for (const [x, r] of [[-5, 0.2], [6, -0.2]]) { const f = part(cap(3.6, 12), M.skin, this.horns, x, 18, 0, 0.7); f.rotation.z = r; }
     part(new THREE.CylinderGeometry(12.5, 13.5, 24, 16), M.skin, this.torso, 2, L.torso + 4, 0);
     this.head = new THREE.Group(); this.head.position.set(2, L.torso + 10, 0); this.torso.add(this.head);
-    def.id === 'lula' ? this.headLula() : this.headFlavio();
+    ({ lula: this.headLula, flavio: this.headFlavio }[def.id] || this.headSuit).call(this);
     // guitar: holder (placement per mode) → inner (offset) → model
-    this.holder = new THREE.Group(); this.gInner = new THREE.Group(); this.holder.add(this.gInner);
-    this.guitar = buildGuitar(def); this.gInner.add(this.guitar);
-    this.tip = new THREE.Object3D(); this.tip.position.set(172, 0, 0); this.guitar.add(this.tip);
-    this.gMode = null; this.setGuitarMode('back');
+    if (def.guitar) {
+      this.holder = new THREE.Group(); this.gInner = new THREE.Group(); this.holder.add(this.gInner);
+      this.guitar = buildGuitar(def); this.gInner.add(this.guitar);
+      this.tip = new THREE.Object3D(); this.tip.position.set(172, 0, 0); this.guitar.add(this.tip);
+      this.gMode = null; this.setGuitarMode('back');
+    }
+    if (def.prop === 'briefcase') { // cameo prop, swinging from the back hand
+      const bc = part(new THREE.BoxGeometry(46, 34, 12), toon('#3b2414'), this.armB.end, 0, -24, 0, 0.9);
+      part(new THREE.TorusGeometry(7, 2, 6, 12, Math.PI), toon('#c9a64a'), bc, 0, 17, 0, 0.5);
+      part(new THREE.BoxGeometry(8, 6, 13), toon('#c9a64a'), bc, 0, 4, 0, 0);
+    }
     if (def.heavy === 'hammer') { // Lula's sledgehammer ("MARTELADA"), held in the front hand
       this.hammer = new THREE.Group(); this.hammer.position.y = -L.fore; this.armF.b.add(this.hammer);
       part(new THREE.CylinderGeometry(4.5, 5, 118, 10), toon('#7a4a24'), this.hammer, 0, -44, 0, 0.8);
@@ -211,6 +218,31 @@ export class Rocker {
     part(new THREE.TorusGeometry(13.5, 3.4, 8, 24), toon('#0e9a48'), T, 3, L + 1, 0, 0.6).rotation.x = Math.PI / 2;
     this.belt(T);
   }
+  torsoSuit() {
+    const T = this.torso, L = this.def.len.torso, d = this.def;
+    const suit = tex(1024, 512, (g, w, h) => {
+      g.fillStyle = d.sleeve; g.fillRect(0, 0, w, h);
+      g.fillStyle = '#f4f4f0'; g.beginPath(); g.moveTo(440, 0); g.lineTo(512, 300); g.lineTo(584, 0); g.closePath(); g.fill();
+      g.fillStyle = '#b3121f'; g.beginPath(); g.moveTo(498, 30); g.lineTo(526, 30); g.lineTo(534, 250); g.lineTo(512, 290); g.lineTo(490, 250); g.closePath(); g.fill();
+      g.strokeStyle = 'rgba(0,0,0,.55)'; g.lineWidth = 6; g.beginPath(); g.moveTo(420, 0); g.lineTo(512, 330); g.lineTo(604, 0); g.stroke();
+      g.fillStyle = '#0d1020'; for (const y of [360, 420]) { g.beginPath(); g.arc(512, y, 8, 0, TAU); g.fill(); }
+    });
+    part(cap(28, L - 52), toon('#ffffff', { map: suit }), T, 0, L * 0.5, 0).scale.set(1.1, 1, 0.92);
+    this.belt(T);
+  }
+  headSuit() {
+    const H = this.head, M = this.M, d = this.def;
+    part(sph(41), toon('#ffffff', { map: faceTexture(d.id, d.skin) }), H, 6, 50, 0).scale.set(1, 1.12, 0.97);
+    part(sph(33), M.skin, H, 12, 28, 0).scale.set(1.02, 0.72, 1.06);
+    const hairM = toon('#ffffff', { map: hairTexture(d.hair, '#0a0705', '#6a5040', 9) });
+    part(new THREE.SphereGeometry(42.8, 28, 14, -0.62 * Math.PI, 1.24 * Math.PI, 0, 0.5 * Math.PI), hairM, H, 5, 50, 0).scale.set(1, 1.12, 0.97);
+    part(new THREE.SphereGeometry(43, 28, 8, 0, TAU, 0, 0.3 * Math.PI), hairM, H, 6, 51, 0, 0.8).scale.set(1, 1.12, 0.97);
+    this.ears(H, -4, 48, 39);
+    part(sph(9), M.skin, H, 49, 42, 0).scale.set(1, 0.95, 1.05);
+    this.mouth = part(sph(8.5), M.mouth, H, 45, 24, 0, 0.6);
+    this.teeth = part(new THREE.BoxGeometry(3, 3, 13), M.white, H, 47.5, 27, 0, 0);
+    this.eyesBrows(H, 42, 58, 14, 5.6, 68, '#1a120c', 0.6);
+  }
   belt(T) {
     const b = part(new THREE.CylinderGeometry(28.5, 28.5, 9, 24), this.M.belt, T, 0, 4, 0, 0.6); b.scale.set(1.12, 1, 0.94);
     part(new THREE.BoxGeometry(5, 12, 15), this.M.gold, T, 32.5, 4, 0, 0.6);
@@ -230,7 +262,7 @@ export class Rocker {
   }
   headLula() {
     const H = this.head, M = this.M;
-    part(sph(40), toon('#ffffff', { map: faceTexture('lula') }), H, 6, 48, 0).scale.set(1, 1.15, 0.95);
+    part(sph(40), toon('#ffffff', { map: faceTexture('lula', '#d99d73') }), H, 6, 48, 0).scale.set(1, 1.15, 0.95);
     part(new THREE.SphereGeometry(42, 28, 14, -0.63 * Math.PI, 1.26 * Math.PI, 0, 0.56 * Math.PI), toon('#ffffff', { map: hairTexture('#c8c4bf', '#8a8580', '#eeeae4', 3) }), H, 5, 48, 0).scale.set(1, 1.15, 0.95);
     part(new THREE.SphereGeometry(42.2, 28, 8, 0, TAU, 0, 0.2 * Math.PI), toon('#b9b5b0'), H, 5, 48, 0, 0.8).scale.set(1, 1.15, 0.95);
     this.ears(H, -4, 46, 37);
@@ -246,7 +278,7 @@ export class Rocker {
   }
   headFlavio() {
     const H = this.head, M = this.M;
-    part(sph(42), toon('#ffffff', { map: faceTexture('flavio') }), H, 6, 50, 0).scale.set(1, 1.1, 0.98);
+    part(sph(42), toon('#ffffff', { map: faceTexture('flavio', '#f0c39b') }), H, 6, 50, 0).scale.set(1, 1.1, 0.98);
     part(sph(36), toon('#ffffff', { map: stubbleTexture() }), H, 12, 27, 0).scale.set(1.02, 0.74, 1.08);
     const hairM = toon('#ffffff', { map: hairTexture('#2b1d14', '#120b07', '#5a4232', 5) });
     part(new THREE.SphereGeometry(43.6, 28, 14, -0.58 * Math.PI, 1.16 * Math.PI, 0, 0.47 * Math.PI), hairM, H, 5, 50, 0).scale.set(1, 1.1, 0.98);
@@ -261,7 +293,7 @@ export class Rocker {
     for (const s of [-1, 1]) part(cap(1.6, 10), M.ink, H, 44.8, 62.4, s * 14, 0).rotation.x = Math.PI / 2;
   }
   setGuitarMode(m) {
-    if (m === this.gMode) return;
+    if (!this.guitar || m === this.gMode) return;
     this.gMode = m;
     const H = this.holder, I = this.gInner, L = this.def.len;
     this.guitar.scale.setScalar(m === 'back' ? 0.78 : 1);

@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { toon, part, canvasTex, hatchU } from './toon.js';
 import { Rocker } from './rocker.js';
+import { Gotinha, Syringe, makeVorcaro, buildDuck } from './extras.js';
 import { W, H, GY, TAU, clamp, lerp, rnd, canvas, FONT } from '../shared.js';
 
 const FOV = 30, TANH = Math.tan(FOV / 2 * Math.PI / 180);
@@ -37,6 +38,10 @@ export class Stage3D {
     const shadowTex = radialTex('rgba(0,0,0,.75)', 'rgba(0,0,0,0)');
     this.blobs = [0, 1].map(() => { const m = new THREE.Mesh(new THREE.PlaneGeometry(170, 50), new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false })); m.rotation.x = -Math.PI / 2; m.renderOrder = 1; this.scene.add(m); return m; });
     this.buildProjectiles();
+    // cameos
+    this.gotinha = new Gotinha(); this.scene.add(this.gotinha.root);
+    this.syringe = new Syringe(); this.scene.add(this.syringe.root);
+    this.vorcaro = makeVorcaro(); this.vorcaro.root.visible = false; this.scene.add(this.vorcaro.root);
     this._v = new THREE.Vector3();
   }
 
@@ -131,6 +136,8 @@ export class Stage3D {
       pool.rotation.x = -Math.PI / 2; pool.renderOrder = 2; S.add(pool);
       this.beams.push({ pivot, mat, pool, ph: i * 1.7 });
     }
+    // giant inflatable yellow duck floating behind the amps
+    this.duck = buildDuck(); this.duck.position.set(-1150, 330, -1000); this.duck.rotation.y = 0.6; this.duck.scale.setScalar(1.15); S.add(this.duck);
     // drifting stage smoke
     const smokeTex = radialTex('rgba(200,160,240,.5)', 'rgba(200,160,240,0)');
     this.smoke = [];
@@ -272,6 +279,15 @@ export class Stage3D {
       m.visible = true; m.position.set(p.x - 640, GY - p.y, 20);
       if (p.kind === 'foice') m.rotation.set(0, 0, -p.rot * 2.2); else m.rotation.z = -p.rot;
     }
+    // cameos and pickups
+    const cm = view.cameo;
+    this.gotinha.root.visible = !!cm && cm.kind === 'gotinha';
+    if (this.gotinha.root.visible) this.gotinha.update(cm.x, GY, cm.dir, cm.t, cm.state === 'act');
+    this.vorcaro.root.visible = !!cm && cm.kind === 'vorcaro';
+    if (this.vorcaro.root.visible) this.vorcaro.setPose(cm.pose, { x: cm.x, y: GY, z: -130, facing: cm.dir, yaw: 0.7, ex: { mouth: 0.45, angry: false } });
+    const vac = (view.items || []).find(it => it.kind === 'vacina');
+    this.syringe.root.visible = !!vac;
+    if (vac) this.syringe.update(vac.x, vac.y, t);
     if (!showcase) this.animateSet(t, view.beat, view.excite || 0, view.dark);
     this.flash.intensity = (view.flash || 0) * 6;
     if (view.flashPos) this.flash.position.set(view.flashPos[0] - 640, GY - view.flashPos[1], 160);
@@ -293,6 +309,7 @@ export class Stage3D {
       b.pool.material.color.copy(col); b.pool.material.opacity = (dark ? 0.15 : 0.4) * pulse;
     }
     this.rimA.color.copy(LIGHTCOLS[bar % LIGHTCOLS.length]); this.rimB.color.copy(LIGHTCOLS[(bar + 2) % LIGHTCOLS.length]);
+    this.duck.position.y = 330 + Math.sin(t * 0.017) * 14; this.duck.rotation.z = Math.sin(t * 0.013) * 0.06;
     for (const m of this.smoke) { m.position.x += m.userData.v; if (m.position.x > 1100) m.position.x = -1100; if (m.position.x < -1100) m.position.x = 1100; }
     const rc = LIGHTCOLS[(bar + 1) % LIGHTCOLS.length];
     for (const m of this.crowd) {
