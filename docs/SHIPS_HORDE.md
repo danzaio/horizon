@@ -35,3 +35,10 @@ Botão ⚽: o anfitrião inicia → constrói um **estádio no céu** (44×26 + 
 
 ## Novos minigames (tecla Y)
 Chão é Lava (pedaços desabam em cadeia), Sumô (empurre para fora, bordas encolhem), Battle Royale (ilha com caixas de armas e bordas que caem), Domínio (3 pontos de controle, times).
+
+## Bichinhos (estilo Pixelmon) — `src/features/critters/`
+* **38 espécies originais** (12 linhas de 3 estágios + 2 lendárias), 8 tipos com tabela de vantagens (Fogo, Água, Planta, Elétrico, Terra, Gelo, Sombra, Vento), 34 golpes, evolução por nível, modelos voxel procedurais.
+* **Selvagens** aparecem no mundo por bioma (níveis crescem com a distância do spawn; lendários raros). Itens (inventário E → Especiais): **Cápsula**, **Super Cápsula** (+90 %), **Cápsula Mestra** (garantida). Botão esquerdo lança e abre a batalha, **botão direito desafia** o bichinho — ou o **jogador** — mirado.
+* **N / 🐾**: grupo (6), caixa, dex (n/38), "Curar todos" e lista de jogadores para desafiar. Primeiro uso: escolha do parceiro inicial.
+* **Batalha por turnos** (golpe, trocar, cápsula, fugir): vitórias dão XP, sobem de nível, aprendem golpes e evoluem. Contra jogadores é **determinística**: os dois clientes rodam o mesmo motor com a mesma semente e as mesmas ações (`pk:ch`, `pk:ac`, `pk:t`, `pk:end`) — sem host; amistoso (ninguém perde nada). Testes: `node src/features/critters/battle.test.mjs`.
+* Salvo em `localStorage` por identidade.
