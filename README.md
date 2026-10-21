@@ -35,7 +35,16 @@ Jogo de luta satírico entre caricaturas do Lula e do Flávio, no estilo de *Gui
 
 **Participações especiais** (eventos aleatórios no meio do round, valem para os dois): o **Zé Gotinha** entra correndo e deixa uma vacina (+15 de vida para quem pegar); o **Vorcaro** atravessa o palco com a maleta jogando "CDB a 140% do CDI" (cada nota dá star power) até o "BANCO MASTER: LIQUIDADO!" queimar o que sobrou. E um pato amarelo gigante inflável flutua atrás do palco. A CPU também corre atrás dos itens.
 
-Código em `luta/`: `src/main.js` (lógica, IA, solo, HUD, telas 2D, áudio), `src/three/stage.js` (palco, câmera de luta, luzes, plateia, projéteis), `src/three/rocker.js` (personagens 3D montados com primitivas e texturas pintadas em canvas, guiados pelos mesmos ângulos de pose da lógica; IK nos braços durante o solo), `src/three/toon.js` (materiais toon + hachura + contorno), `src/three/extras.js` (Zé Gotinha, vacina, Vorcaro, pato). Para testes: `?scene=title|mode|select|vs|fight|result&mode=1|2&mute=1` e `window.__gb` (`game`, `step(n)`, `startSolo`, `r3`).
+**Torcidas.** Cada lutador tem a sua, de um lado do palco, com flâmulas e placas na plateia, faixa com o nome e um puxador de megafone num tablado:
+
+| | Lula | Flávio |
+|---|---|---|
+| Torcida | **EXÉRCITO DO LULA** | **TROPA DO FLÁVIO** |
+| Puxador | **Janones** (grita **"EXPLODE!!!"**) | **Nikolas Ferreira "Chupetinha"** (grita "AVANTE, TROPA!!!") |
+
+Acertar golpes enche o medidor da torcida (barra sob o star power); ao encher, o puxador grita (balão na tela, voz via síntese de fala do navegador quando disponível) e o lutador ganha +4 de vida e +12 de star power. A torcida do vencedor comemora no fim do round. Os textos ficam em `CHARS.*.torcida` no `luta/src/main.js`.
+
+Código em `luta/`: `src/main.js` (lógica, IA, solo, HUD, telas 2D, áudio), `src/three/stage.js` (palco, câmera de luta, luzes, plateia, projéteis), `src/three/rocker.js` (personagens 3D montados com primitivas e texturas pintadas em canvas, guiados pelos mesmos ângulos de pose da lógica; IK nos braços durante o solo), `src/three/toon.js` (materiais toon + hachura + contorno), `src/three/extras.js` (Zé Gotinha, vacina, Vorcaro, pato, puxadores das torcidas). Para testes: `?scene=title|mode|select|vs|fight|result&mode=1|2&mute=1` e `window.__gb` (`game`, `step(n)`, `startSolo`, `r3`).
 
 ## Rodar
 

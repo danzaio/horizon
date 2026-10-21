@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { toon, part, canvasTex, hatchU } from './toon.js';
 import { Rocker } from './rocker.js';
-import { Gotinha, Syringe, makeVorcaro, buildDuck } from './extras.js';
+import { Gotinha, Syringe, makeVorcaro, buildDuck, LEADERS } from './extras.js';
 import { W, H, GY, TAU, clamp, lerp, rnd, canvas, FONT } from '../shared.js';
 
 const FOV = 30, TANH = Math.tan(FOV / 2 * Math.PI / 180);
@@ -29,7 +29,7 @@ export class Stage3D {
     this.scene.fog = new THREE.Fog('#2a0b30', 2200, 6000);
     this.camera = new THREE.PerspectiveCamera(FOV, W / H, 10, 14000);
     this.cam = { x: 640, y: 200, w: 1250, orbit: 0, init: false };
-    this.t = 0;
+    this.t = 0; this.chars = chars;
     this.buildLights();
     this.set = new THREE.Group(); this.scene.add(this.set);
     this.buildStage(); this.buildCity(); this.buildCrowd();
@@ -42,6 +42,8 @@ export class Stage3D {
     this.gotinha = new Gotinha(); this.scene.add(this.gotinha.root);
     this.syringe = new Syringe(); this.scene.add(this.syringe.root);
     this.vorcaro = makeVorcaro(); this.vorcaro.root.visible = false; this.scene.add(this.vorcaro.root);
+    this.buildTorcidas();
+    this.setTorcidas(Object.keys(chars));
     this._v = new THREE.Vector3();
   }
 
@@ -207,18 +209,90 @@ export class Stage3D {
       g.fillStyle = '#000';
       if (variant >= 1) { g.beginPath(); g.arc(14 + variant * 3, 22, 10, 0, TAU); g.fill(); }
       if (variant >= 2) { g.beginPath(); g.arc(112 - variant, 16, 10, 0, TAU); g.fill(); }
-      if (variant === 3) { g.fillStyle = '#ffe9a0'; g.beginPath(); g.ellipse(109, 2, 4, 8, 0, 0, TAU); g.fill(); }
     }));
-    this.crowdMats = [0, 1, 2, 3].map(v => new THREE.MeshBasicMaterial({ map: mk(v), transparent: true, alphaTest: 0.3, fog: false }));
-    const geo = new THREE.PlaneGeometry(130, 228);
+    const faces = [0, 1, 2, 3].map(mk);
+    // [side][variant]: left half of the arena cheers for the left fighter, right half for the right one
+    this.crowdMats = [0, 1].map(() => faces.map(t => new THREE.MeshBasicMaterial({ map: t, transparent: true, alphaTest: 0.3, fog: false })));
+    this.tint = [new THREE.Color('#ff4a5a'), new THREE.Color('#7dff5a')];
+    this.crowdExc = [0.2, 0.2];
+    const ids = Object.keys(this.chars).filter(id => this.chars[id].torcida);
+    // per-torcida cloth for flags and cardboard signs
+    const flagMat = {}, signMat = {};
+    for (const id of ids) {
+      const T = this.chars[id].torcida;
+      flagMat[id] = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, fog: false, map: canvasTex(paint(128, 80, (g, w, h) => {
+        g.fillStyle = T.cloth; g.fillRect(0, 0, w, h); g.lineWidth = 6; g.strokeStyle = '#130a16'; g.strokeRect(0, 0, w, h);
+        g.fillStyle = T.emblemCol; g.strokeStyle = '#130a16'; g.lineWidth = 3;
+        if (T.emblem === 'star') { g.beginPath(); for (let i = 0; i < 10; i++) { const r = i % 2 ? 11 : 26, a = i / 10 * TAU - Math.PI / 2; g.lineTo(64 + Math.cos(a) * r, 40 + Math.sin(a) * r); } g.closePath(); g.fill(); g.stroke(); }
+        else { g.font = `54px ${FONT}`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.strokeText(T.emblem, 64, 42); g.fillText(T.emblem, 64, 42); }
+      })) });
+      signMat[id] = T.signs.map(txt => new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, fog: false, map: canvasTex(paint(256, 160, (g, w, h) => {
+        g.fillStyle = '#ead9a8'; g.fillRect(0, 0, w, h); g.lineWidth = 10; g.strokeStyle = T.cloth; g.strokeRect(5, 5, w - 10, h - 10);
+        let size = 70; g.font = `${size}px ${FONT}`; while (g.measureText(txt).width > w - 40) { size -= 4; g.font = `${size}px ${FONT}`; }
+        g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#16131a'; g.fillText(txt, w / 2, h / 2 + 4);
+      })) }));
+    }
+    const geo = new THREE.PlaneGeometry(130, 228), flagGeo = new THREE.PlaneGeometry(64, 40), signGeo = new THREE.PlaneGeometry(92, 57);
+    const poleGeo = new THREE.CylinderGeometry(2.2, 2.2, 1, 6), poleMat = new THREE.MeshBasicMaterial({ color: '#0b060d', fog: false });
     this.crowd = [];
     for (let row = 0; row < 3; row++) for (let x = -1000; x <= 1000; x += 64 + row * 10) {
-      const m = new THREE.Mesh(geo, this.crowdMats[(Math.random() * 4) | 0]);
-      const s = 0.95 + row * 0.12 + rnd(-0.05, 0.08);
-      m.scale.setScalar(s); m.position.set(x + rnd(-18, 18), -170 + 114 * s, 300 + row * 80);
-      m.userData = { base: m.position.y, ph: rnd(0, TAU), amp: rnd(0.7, 1.3) };
+      const side = x < 0 ? 0 : 1, variant = (Math.random() * 4) | 0;
+      const m = new THREE.Mesh(geo, this.crowdMats[side][variant]);
+      const sc = 0.95 + row * 0.12 + rnd(-0.05, 0.08);
+      m.scale.setScalar(sc); m.position.set(x + rnd(-18, 18), -170 + 114 * sc, 300 + row * 80);
+      m.userData = { base: m.position.y, ph: rnd(0, TAU), amp: rnd(0.7, 1.3), side, decos: [] };
+      if (variant >= 1 && Math.random() < 0.4) {
+        const flag = Math.random() < 0.6, k = (Math.random() * 3) | 0;
+        const hx = variant === 1 ? -47 : variant === 2 ? (Math.random() < 0.5 ? -44 : 46) : (Math.random() < 0.5 ? -41 : 45), len = flag ? 112 : 78;
+        for (const id of ids) {
+          const g = new THREE.Group(); g.position.set(hx, 90, 1); g.scale.setScalar(0.55); g.visible = false; g.userData.id = id;
+          const pole = new THREE.Mesh(poleGeo, poleMat); pole.scale.y = len; pole.position.y = len / 2; g.add(pole);
+          const cloth = new THREE.Mesh(flag ? flagGeo : signGeo, flag ? flagMat[id] : signMat[id][k]);
+          cloth.position.set(flag ? 32 : 0, flag ? len - 20 : len + 24, 0.5); g.add(cloth);
+          m.add(g); m.userData.decos.push({ g, cloth, flag });
+        }
+      }
       this.scene.add(m); this.crowd.push(m);
     }
+  }
+
+  // each torcida: a leader with a megaphone on a riser, a banner with the group name
+  buildTorcidas() {
+    this.tors = {};
+    const plate = (l1, l2, bg) => canvasTex(paint(512, 128, (g, w, h) => {
+      g.fillStyle = bg; g.fillRect(0, 0, w, h); g.lineWidth = 10; g.strokeStyle = '#130a16'; g.strokeRect(0, 0, w, h);
+      g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineJoin = 'round';
+      const t = (txt, y, size, col) => { g.font = `${size}px ${FONT}`; while (g.measureText(txt).width > w - 40) { size -= 3; g.font = `${size}px ${FONT}`; } g.lineWidth = size * 0.2; g.strokeStyle = '#130a16'; g.strokeText(txt, w / 2, y); g.fillStyle = col; g.fillText(txt, w / 2, y); };
+      t(l1, 50, 56, '#ffffff'); t(l2, 98, 28, '#ffe9a0');
+    }));
+    for (const id in this.chars) {
+      const T = this.chars[id].torcida; if (!T) continue;
+      const G = new THREE.Group(); G.visible = false; this.scene.add(G);
+      const leader = new Rocker(LEADERS[T.leaderId]); G.add(leader.root);
+      const riser = new THREE.Group(); G.add(riser);
+      const face = new THREE.MeshLambertMaterial({ map: plate(T.leader, 'PUXADOR DA TORCIDA', T.cloth) }), side = toon('#1a1118');
+      part(new THREE.BoxGeometry(150, 44, 90), [side, side, side, side, face, side], riser, 0, 22, 120, 0.8);
+      const pm = toon('#8d8f9c');
+      for (const dx of [-100, 100]) part(new THREE.CylinderGeometry(2.6, 2.6, 300, 8), pm, riser, dx, 150, 70, 0.5);
+      part(new THREE.BoxGeometry(206, 5, 5), pm, riser, 0, 292, 70, 0.5);
+      const banner = new THREE.Mesh(new THREE.PlaneGeometry(196, 78), new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, fog: false, map: canvasTex(paint(512, 205, (g, w, h) => {
+        g.fillStyle = T.cloth; g.fillRect(0, 0, w, h); g.lineWidth = 14; g.strokeStyle = '#130a16'; g.strokeRect(0, 0, w, h);
+        g.strokeStyle = T.emblemCol; g.lineWidth = 5; g.strokeRect(16, 16, w - 32, h - 32);
+        g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineJoin = 'round';
+        const line = (txt, y, size) => { g.font = `${size}px ${FONT}`; while (g.measureText(txt).width > w - 70) { size -= 4; g.font = `${size}px ${FONT}`; } g.lineWidth = size * 0.2; g.strokeStyle = '#130a16'; g.strokeText(txt, w / 2, y); g.fillStyle = T.emblemCol; g.fillText(txt, w / 2, y); };
+        const [first, ...rest] = T.name.split(' ');
+        line(first, 70, 96); line(rest.join(' '), 150, 78);
+      })) }));
+      banner.position.set(0, 252, 70); riser.add(banner);
+      this.tors[id] = { group: G, riser, leader };
+    }
+  }
+
+  // which character's torcida sits on which half of the arena
+  setTorcidas(ids) {
+    this.torIds = ids;
+    this.tint[0].set(this.chars[ids[0]].torcida.tint); this.tint[1].set(this.chars[ids[1] || ids[0]].torcida.tint);
+    for (const m of this.crowd) for (const d of m.userData.decos) d.g.visible = d.g.userData.id === ids[m.userData.side];
   }
 
   buildProjectiles() {
@@ -288,6 +362,15 @@ export class Stage3D {
     const vac = (view.items || []).find(it => it.kind === 'vacina');
     this.syringe.root.visible = !!vac;
     if (vac) this.syringe.update(vac.x, vac.y, t);
+    // torcida leaders on their risers
+    for (const id in this.tors) this.tors[id].group.visible = false;
+    this.crowdExc = view.cheer || this.crowdExc;
+    if (!showcase && view.torcidas) view.torcidas.forEach((tc, i) => {
+      const tor = this.tors[tc.id]; if (!tor) return;
+      const sx = i ? 500 : -500;
+      tor.group.visible = true; tor.riser.position.x = sx;
+      tor.leader.setPose(tc.pose, { x: 640 + sx, y: GY - 44 - (tc.hop || 0) * 0.6, z: 120, facing: i ? -1 : 1, yaw: 0.5, ex: tc.ex, scale: 0.62 });
+    });
     if (!showcase) this.animateSet(t, view.beat, view.excite || 0, view.dark);
     this.flash.intensity = (view.flash || 0) * 6;
     if (view.flashPos) this.flash.position.set(view.flashPos[0] - 640, GY - view.flashPos[1], 160);
@@ -311,13 +394,17 @@ export class Stage3D {
     this.rimA.color.copy(LIGHTCOLS[bar % LIGHTCOLS.length]); this.rimB.color.copy(LIGHTCOLS[(bar + 2) % LIGHTCOLS.length]);
     this.duck.position.y = 330 + Math.sin(t * 0.017) * 14; this.duck.rotation.z = Math.sin(t * 0.013) * 0.06;
     for (const m of this.smoke) { m.position.x += m.userData.v; if (m.position.x > 1100) m.position.x = -1100; if (m.position.x < -1100) m.position.x = 1100; }
-    const rc = LIGHTCOLS[(bar + 1) % LIGHTCOLS.length];
+    const dk = dark ? 0.35 : 0.75, pul = 0.85 + 0.15 * Math.pow(1 - (beat % 1), 2);
+    for (let i = 0; i < 2; i++) for (const mat of this.crowdMats[i]) mat.color.copy(this.tint[i]).multiplyScalar(dk * pul * (0.8 + this.crowdExc[i] * 0.5));
     for (const m of this.crowd) {
-      const u = m.userData;
+      const u = m.userData, e = this.crowdExc[u.side];
       m.rotation.y = Math.atan2(this.camera.position.x - m.position.x, this.camera.position.z - m.position.z);
-      m.position.y = u.base + Math.abs(Math.sin(beat * Math.PI + u.ph * 0.3)) * (5 + excite * 12) * u.amp;
+      m.position.y = u.base + Math.abs(Math.sin(beat * Math.PI + u.ph * 0.3)) * (5 + e * 14) * u.amp;
+      for (const d of u.decos) if (d.g.visible) {
+        d.g.rotation.z = Math.sin(t * 0.18 + u.ph) * (0.08 + 0.22 * e);
+        if (d.flag) d.cloth.scale.x = 1 + Math.sin(t * 0.3 + u.ph) * 0.1 * (1 + e);
+      }
     }
-    for (const mat of this.crowdMats) mat.color.copy(rc).multiplyScalar(dark ? 0.35 : 0.7);
   }
 
   updateCamera(view) {

@@ -37,9 +37,9 @@ function faceTexture(id, skin) {
     }
   });
 }
-function stubbleTexture() {
+function stubbleTexture(skin = '#f0c39b') {
   return tex(512, 256, (g, w, h) => {
-    g.fillStyle = '#f0c39b'; g.fillRect(0, 0, w, h);
+    g.fillStyle = skin; g.fillRect(0, 0, w, h);
     const gr = g.createLinearGradient(0, 40, 0, 200); gr.addColorStop(0, 'rgba(70,80,110,0)'); gr.addColorStop(1, 'rgba(70,80,110,.42)');
     g.fillStyle = gr; g.fillRect(0, 0, w, h);
     g.fillStyle = 'rgba(50,55,80,.12)'; for (let i = 0; i < 1600; i++) { const y = 80 + Math.random() * 170; g.fillRect(Math.random() * w, y, 1.2, 1.2); }
@@ -172,6 +172,12 @@ export class Rocker {
       this.tip = new THREE.Object3D(); this.tip.position.set(172, 0, 0); this.guitar.add(this.tip);
       this.gMode = null; this.setGuitarMode('back');
     }
+    if (def.prop === 'megaphone') { // held in the front hand, wide end pointing along the arm
+      const mg = new THREE.Group(); mg.position.y = -6; this.armF.end.add(mg);
+      part(new THREE.CylinderGeometry(24, 7, 58, 16), toon(def.mega || '#ffd400'), mg, 0, -38, 0, 0.8);
+      part(new THREE.CylinderGeometry(8, 8, 16, 12), toon('#1c1a21'), mg, 0, -2, 0, 0.6);
+      part(new THREE.TorusGeometry(24, 3, 6, 16), toon('#ffffff'), mg, 0, -67, 0, 0.5).rotation.x = Math.PI / 2;
+    }
     if (def.prop === 'briefcase') { // cameo prop, swinging from the back hand
       const bc = part(new THREE.BoxGeometry(46, 34, 12), toon('#3b2414'), this.armB.end, 0, -24, 0, 0.9);
       part(new THREE.TorusGeometry(7, 2, 6, 12, Math.PI), toon('#c9a64a'), bc, 0, 17, 0, 0.5);
@@ -220,6 +226,20 @@ export class Rocker {
   }
   torsoSuit() {
     const T = this.torso, L = this.def.len.torso, d = this.def;
+    if (d.tee) { // supporter tee: solid colour, big word on the chest and name on the back
+      const tee = tex(1024, 512, (g, w, h) => {
+        g.fillStyle = d.tee.bg; g.fillRect(0, 0, w, h);
+        const word = (x, y, size, text) => {
+          g.font = `${size}px ${FONT}`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineJoin = 'round';
+          g.lineWidth = size * 0.2; g.strokeStyle = '#130a16'; g.strokeText(text, x, y); g.fillStyle = d.tee.fg; g.fillText(text, x, y);
+        };
+        word(512, 230, 74, d.tee.text); word(0, 240, 100, d.tee.back); word(1024, 240, 100, d.tee.back);
+      });
+      part(cap(28, L - 52), toon('#ffffff', { map: tee }), T, 0, L * 0.5, 0).scale.set(1.1, 1, 0.92);
+      part(new THREE.TorusGeometry(13.5, 3.4, 8, 24), toon(d.tee.fg), T, 3, L + 1, 0, 0.6).rotation.x = Math.PI / 2;
+      this.belt(T);
+      return;
+    }
     const suit = tex(1024, 512, (g, w, h) => {
       g.fillStyle = d.sleeve; g.fillRect(0, 0, w, h);
       g.fillStyle = '#f4f4f0'; g.beginPath(); g.moveTo(440, 0); g.lineTo(512, 300); g.lineTo(584, 0); g.closePath(); g.fill();
@@ -237,8 +257,14 @@ export class Rocker {
     const hairM = toon('#ffffff', { map: hairTexture(d.hair, '#0a0705', '#6a5040', 9) });
     part(new THREE.SphereGeometry(42.8, 28, 14, -0.62 * Math.PI, 1.24 * Math.PI, 0, 0.5 * Math.PI), hairM, H, 5, 50, 0).scale.set(1, 1.12, 0.97);
     part(new THREE.SphereGeometry(43, 28, 8, 0, TAU, 0, 0.3 * Math.PI), hairM, H, 6, 51, 0, 0.8).scale.set(1, 1.12, 0.97);
+    if (d.stubble) part(sph(35), toon('#ffffff', { map: stubbleTexture(d.skin) }), H, 12, 28, 0).scale.set(1.03, 0.74, 1.08);
+    if (d.quiff) part(sph(30), hairM, H, 12, 92, -2, 0.8).scale.set(1.2, 0.32, 1.1);
     this.ears(H, -4, 48, 39);
     part(sph(9), M.skin, H, 49, 42, 0).scale.set(1, 0.95, 1.05);
+    if (d.glasses) {
+      for (const s of [-1, 1]) part(new THREE.TorusGeometry(9.5, 1.6, 6, 18), toon('#16131a'), H, 46, 58, s * 14, 0.5).rotation.y = Math.PI / 2;
+      part(new THREE.CylinderGeometry(1.3, 1.3, 10, 6), toon('#16131a'), H, 46, 58, 0, 0).rotation.x = Math.PI / 2;
+    }
     this.mouth = part(sph(8.5), M.mouth, H, 45, 24, 0, 0.6);
     this.teeth = part(new THREE.BoxGeometry(3, 3, 13), M.white, H, 47.5, 27, 0, 0);
     this.eyesBrows(H, 42, 58, 14, 5.6, 68, '#1a120c', 0.6);
@@ -279,7 +305,7 @@ export class Rocker {
   headFlavio() {
     const H = this.head, M = this.M;
     part(sph(42), toon('#ffffff', { map: faceTexture('flavio', '#f0c39b') }), H, 6, 50, 0).scale.set(1, 1.1, 0.98);
-    part(sph(36), toon('#ffffff', { map: stubbleTexture() }), H, 12, 27, 0).scale.set(1.02, 0.74, 1.08);
+    part(sph(36), toon('#ffffff', { map: stubbleTexture('#f0c39b') }), H, 12, 27, 0).scale.set(1.02, 0.74, 1.08);
     const hairM = toon('#ffffff', { map: hairTexture('#2b1d14', '#120b07', '#5a4232', 5) });
     part(new THREE.SphereGeometry(43.6, 28, 14, -0.58 * Math.PI, 1.16 * Math.PI, 0, 0.47 * Math.PI), hairM, H, 5, 50, 0).scale.set(1, 1.1, 0.98);
     part(new THREE.SphereGeometry(43.9, 28, 8, 0, TAU, 0, 0.24 * Math.PI), hairM, H, 6, 50, 0, 0.8).scale.set(1, 1.1, 0.98);

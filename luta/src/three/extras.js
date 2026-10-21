@@ -11,6 +11,15 @@ export const VORCARO = {
 };
 export const makeVorcaro = () => new Rocker(VORCARO);
 
+// Torcida leaders: Janones (Exército do Lula) and Nikolas "Chupetinha" (Tropa do Flávio), megaphone in hand
+const LEADER_BASE = { len: { torso: 96, thigh: 60, shin: 58, upper: 54, fore: 50 }, limb: { thigh: 28, shin: 23, upper: 23, fore: 20 }, prop: 'megaphone' };
+export const LEADERS = {
+  janones: { ...LEADER_BASE, id: 'janones', skin: '#c68b63', pants: '#2a3350', pantsS: '#161c30', sleeve: '#c8122c', fore: '#c68b63', boot: '#f2f2ee',
+    hair: '#16100c', stubble: true, mega: '#ffd400', tee: { bg: '#c8122c', fg: '#ffffff', text: 'EXPLODE', back: 'JANONES' } },
+  nikolas: { ...LEADER_BASE, id: 'nikolas', skin: '#f0c8a2', pants: '#1f2a44', pantsS: '#10172c', sleeve: '#ffd21a', fore: '#f0c8a2', boot: '#ffffff',
+    hair: '#2b1c13', stubble: true, glasses: true, quiff: true, mega: '#0e9a48', tee: { bg: '#ffd21a', fg: '#0e9a48', text: 'TROPA', back: 'CHUPETINHA' } },
+};
+
 const sph = (r) => new THREE.SphereGeometry(r, 24, 16);
 const cap = (r, l) => new THREE.CapsuleGeometry(r, l, 4, 12);
 

@@ -99,6 +99,14 @@ const audio = {
     this.noise = buf;
     music.start();
   },
+  // the leader's voice, via the browser's speech synthesis (silently skipped where unavailable)
+  say(text, pitch = 1.2) {
+    if (this.muted || !('speechSynthesis' in window)) return;
+    try {
+      const u = new SpeechSynthesisUtterance(text); u.lang = 'pt-BR'; u.rate = 1.1; u.pitch = pitch; u.volume = 1;
+      speechSynthesis.cancel(); speechSynthesis.speak(u);
+    } catch (_) { /* no speech available */ }
+  },
   toggleMute() { this.muted = !this.muted; if (this.master) this.master.gain.value = this.muted ? 0 : 0.55; },
   get t() { return this.ctx ? this.ctx.currentTime : 0; },
   env(g, t, a, peak, dur) { g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + dur); },
@@ -150,6 +158,7 @@ const audio = {
         for (let i = 0; i < 4; i++) { const w = t + rnd(0.1, 1.2); this.tone(w, 'sine', rnd(1800, 2600), rnd(2600, 3400), rnd(0.15, 0.35), 0.05 * v); }
         break;
       }
+      case 'roar': this.sfx('cheer', 1.6); this.noiseHit(t, 0.6, 600, 0.6, 0.5 * v, 'lowpass'); this.tone(t, 'sawtooth', 190, 85, 0.5, 0.22 * v); this.tone(t, 'square', 95, 60, 0.45, 0.2 * v); break;
       case 'coin': this.tone(t, 'square', 988, 988, 0.06, 0.12 * v); this.tone(t + 0.06, 'square', 1319, 1319, 0.12, 0.12 * v); break;
       case 'kaching': this.noiseHit(t, 0.08, 5000, 2, 0.4 * v); this.tone(t + 0.05, 'triangle', 1568, 1568, 0.5, 0.25 * v); this.tone(t + 0.05, 'triangle', 2093, 2093, 0.5, 0.18 * v); break;
       case 'heal': [523, 659, 784, 1047].forEach((f, i) => this.tone(t + i * 0.07, 'sine', f, f, 0.25, 0.22 * v)); break;
@@ -230,6 +239,8 @@ const CHARS = {
     accent: '#ff2a2a', accent2: '#ffd400', bg: ['#5a0010', '#c8102e'],
     proj: 'foice', projName: 'FOICE E MARTELO', proj2: 'sigilo', proj2Name: 'LIBERA O SIGILO!', heavy: 'hammer', superName: 'SOLO DO COMPANHEIRO',
     moves: ['R: FOICE E MARTELO', '↓+R: LIBERA O SIGILO!', 'H: MARTELADA'],
+    torcida: { name: 'EXÉRCITO DO LULA', leader: 'JANONES', leaderId: 'janones', shout: 'EXPLODE!!!', say: 'Explode!', pitch: 1.35,
+      col: '#c8122c', cloth: '#c8122c', emblem: 'star', emblemCol: '#ffd400', tint: '#ff4a5a', signs: ['COMPANHEIRO', 'O BARBA', 'PICANHA'] },
     stats: [['FORÇA', 5], ['VELOCIDADE', 3], ['CARISMA', 5]],
     quotes: ['Nunca antes na história deste país se viu um solo desses, companheiro!', 'Picanha e rock\'n\'roll pra todo mundo!', 'Companheiro, eu toco guitarra desde o tempo da fábrica!'],
     taunts: ['COMPANHEIRO!', 'É O BARBA!', 'PICANHA!'],
@@ -248,6 +259,8 @@ const CHARS = {
     accent: '#ffd21a', accent2: '#0e9a48', bg: ['#063d1f', '#0e9a48'],
     proj: 'bola', projName: 'BOLA ZERO UM', proj2: 'lulinha', proj2Name: 'E O LULINHA?', heavy: 'guitar', superName: 'SOLO ZERO UM',
     moves: ['R: BOLA ZERO UM', '↓+R: E O LULINHA?', 'H: GUITARRADA'],
+    torcida: { name: 'TROPA DO FLÁVIO', leader: 'NIKOLAS "CHUPETINHA"', leaderId: 'nikolas', shout: 'AVANTE, TROPA!!!', say: 'Avante, tropa!', pitch: 1.1,
+      col: '#0e9a48', cloth: '#0e9a48', emblem: '01', emblemCol: '#ffd21a', tint: '#c8ff3a', signs: ['ZERO UM', 'MERMÃO', 'TROPA'] },
     stats: [['FORÇA', 4], ['VELOCIDADE', 5], ['CARISMA', 3]],
     quotes: ['Zero Um no placar, zero chance pra você!', 'Isso aqui é rock carioca, mermão!', 'Pode pedir música que hoje o show é meu!'],
     taunts: ['ZERO UM!', 'MERMÃO!', 'GOOOL!'],
@@ -280,6 +293,8 @@ const POSES = {
   cblock: P({ lean: 10, head: -20, sb: 55, eb: 135, sf: 66, ef: 135, hb: 30, kb: -118, hf: 78, kf: -112 }),
   hit: P({ lean: -26, head: -24, sb: -40, eb: 40, sf: -20, ef: 50, hb: -14, kb: -8, hf: 30, kf: -20 }),
   down: P({ lean: 0, head: -10, sb: -150, eb: 10, sf: -120, ef: 20, hb: 10, kb: -10, hf: 34, kf: -34, rot: -84 }),
+  chant: P({ lean: -6, head: -10, sb: 30, eb: 100, sf: 150, ef: 30, hb: -14, kb: -6, hf: 16, kf: -14 }),
+  cheer: P({ lean: -16, head: -18, sb: -165, eb: 10, sf: 165, ef: 8, hb: -20, kb: -8, hf: 22, kf: -16 }),
   shock: P({ lean: -14, head: -25, sb: -130, eb: 30, sf: -110, ef: -30, hb: -25, kb: 0, hf: 30, kf: 0 }),
   shred: P({ lean: -10, head: 12, hb: -30, kb: -10, hf: 34, kf: -22 }),
   win: P({ lean: -6, head: -14, sb: 30, eb: 100, sf: 168, ef: 8, hb: -22, kb: -6, hf: 22, kf: -12 }),
@@ -879,6 +894,30 @@ function comicText(c, text, x, y, size, top = '#fff6a0', bot = '#ff3a12', align 
 // =====================================================================================
 //  FIGHTER LOGIC
 // =====================================================================================
+// =====================================================================================
+//  TORCIDAS: the crowd behind each fighter. Landing hits fills its meter; when full the leader shouts
+//  ("EXPLODE!!!" for Janones) and the fighter gets a boost.
+// =====================================================================================
+function cheerUp(f, amount) {
+  if (game.phase !== 'fight' || f.ko) return;
+  f.cheer = Math.min(100, f.cheer + amount);
+  if (f.cheer >= 100) triggerShout(f);
+}
+function triggerShout(f) {
+  const T = f.def.torcida;
+  f.cheer = 0; f.hp = Math.min(100, f.hp + 4); f.meter = Math.min(100, f.meter + 12);
+  game.shouts.push({ side: f.side, t: 0, text: T.shout, who: T.leader, col: T.col });
+  game.boost[f.side] = 1; game.shake = Math.max(game.shake, 8);
+  audio.sfx('roar'); audio.say(T.say, T.pitch);
+}
+function leaderLook(i) {
+  const t = game.t, f = i ? game.f2 : game.f1, T = f.def.torcida;
+  const sh = game.shouts.find(s => s.side === i), e = sh ? 1 : clamp(f.cheer / 100 + game.boost[i], 0, 1);
+  const p = copyPose(sh ? POSES.cheer : POSES.chant), w = Math.sin(t * (sh ? 0.5 : 0.16 + e * 0.12));
+  p.sf += w * (sh ? 14 : 20) * D; p.sb += (sh ? -w : 0) * 10 * D; p.lean += Math.abs(w) * 6 * D * (1 + e);
+  return { id: f.def.id, pose: p, hop: Math.abs(w) * (sh ? 22 : 5 + e * 10), ex: { mouth: sh ? 0.9 : 0.25 + 0.5 * e * Math.abs(w), angry: false } };
+}
+
 const MOVES = {
   punch: { s: 5, a: 4, r: 9, dmg: 5, x0: 20, x1: 108, y0: -245, y1: -170, kb: 4, stun: 15, bstun: 9, meter: 7, sfx: 'punch', w: 'punchW', p: 'punchS' },
   cpunch: { s: 5, a: 4, r: 10, dmg: 4, x0: 20, x1: 108, y0: -165, y1: -95, kb: 3, stun: 14, bstun: 8, meter: 6, sfx: 'punch', w: 'cblock', p: 'cpunchS', crouch: true },
@@ -895,6 +934,7 @@ let projs = [];
 class Fighter {
   constructor(def, side) { this.def = def; this.side = side; this.wins = 0; this.meter = 0; this.reset(); }
   reset() {
+    this.cheer = 0;
     this.x = this.side === 0 ? 420 : 860; this.y = GY; this.vx = 0; this.vy = 0;
     this.facing = this.side === 0 ? 1 : -1; this.hp = 100; this.dispHp = 100; this.dispDelay = 0;
     this.state = 'idle'; this.st = 0; this.move = null; this.mf = 0; this.connected = false;
@@ -1073,6 +1113,7 @@ function tryHit(att, def, mv, x0, y0, x1, y1, isProj) {
   const dmg = mv.dmg * pw * Math.max(0.45, 1 - (def.combo - 1) * 0.12);
   def.hp = Math.max(0, def.hp - dmg); def.dispDelay = 30;
   att.meter = Math.min(100, att.meter + mv.meter); def.meter = Math.min(100, def.meter + mv.meter * 0.6);
+  cheerUp(att, 6 + dmg * 1.4);
   def.move = null;
   if (def.hp <= 0 || mv.kd || def.airborne) {
     def.state = 'down'; def.st = 0; def.vy = -9; def.y = Math.min(def.y, GY - 1); def.vx = dirx * (mv.kd ? 7 : 5);
@@ -1168,7 +1209,7 @@ function updateSolo() {
       const tip = att.guitarTip();
       bolt(tip[0], tip[1], def.x + rnd(-20, 20), def.y - rnd(120, 260), LANE_COL[lane]);
       spark(def.x, def.y - 180, 12, LANE_COL[lane], 10);
-      audio.lead(lane, best.res === 'perfect'); audio.sfx('punch', 0.5);
+      audio.lead(lane, best.res === 'perfect'); audio.sfx('punch', 0.5); cheerUp(att, 5);
       S.fb.push({ text: best.res === 'perfect' ? 'PERFEITO!' : 'BOA!', lane, life: 30 });
       game.shake = Math.max(game.shake, 5); game.excite = 1;
     } else { audio.sfx('miss', 0.7); }
@@ -1307,6 +1348,7 @@ const game = {
   scene: 'title', t: 0, mode: 1, modeSel: 0, charSel: 0, f1: null, f2: null, ctl1: null, ctl2: null,
   round: 1, phase: 'intro', phaseT: 0, timer: 99, hitstop: 0, shake: 0, excite: 0, solo: null, pyro: 0,
   winner: null, sceneT: 0, paused: false, pauseSel: 0, lastRoundWinner: null,
+  shouts: [], boost: [0, 0],
 };
 function setScene(s) { game.scene = s; game.sceneT = 0; }
 function newMatch() {
@@ -1315,10 +1357,11 @@ function newMatch() {
   game.f1.ctrl = game.mode === 1 ? 'p1+' : 'p1'; game.f2.ctrl = game.mode === 1 ? 'cpu' : 'p2';
   game.ai = game.mode === 1 ? new AI(game.f2) : null;
   game.round = 1; startRound(); setScene('fight');
+  if (r3) r3.setTorcidas([game.f1.def.id, game.f2.def.id]);
 }
 function startRound() {
   for (const f of [game.f1, game.f2]) f.reset();
-  projs = []; parts = []; bolts = []; items = []; game.solo = null; game.cameo = null;
+  projs = []; parts = []; bolts = []; items = []; game.solo = null; game.cameo = null; game.shouts = []; game.boost = [0, 0];
   game.nextCameo = 700 + irnd(600); game.cameoN = game.cameoN || irnd(2);
   game.phase = 'intro'; game.phaseT = 0; game.timer = 99; game.timerF = 0; game.hitstop = 0; game.winner = null;
   if (game.round === 1) { game.f1.state = game.f2.state = 'intro'; }
@@ -1338,6 +1381,11 @@ function updateFight() {
     return;
   }
   game.excite *= 0.985; game.flash = (game.flash || 0) * 0.85;
+  for (const f of [f1, f2]) f.cheer = Math.max(0, f.cheer - 0.02);
+  for (let i = 0; i < 2; i++) game.boost[i] *= 0.985;
+  if (game.winner) game.boost[game.winner.side] = 1;
+  for (const sh of game.shouts) sh.t++;
+  game.shouts = game.shouts.filter(sh => sh.t < 95);
   if (game.pyro > 0) { game.pyro--; if (game.t % 3 === 0) { fire(200, 480, 2, 10, -10); fire(W - 200, 480, 2, 10, -10); } }
   updateParts();
   if (game.shake > 0) game.shake *= 0.85;
@@ -1498,6 +1546,11 @@ function drawHUD(c) {
     c.strokeStyle = OUT; c.lineWidth = 2; for (let i = 1; i < 4; i++) line(c, mx + i * mw / 4, my, mx + i * mw / 4, my + 14);
     if (full) { c.save(); c.globalAlpha = 0.5 + 0.5 * Math.sin(game.t * 0.25); comicText(c, isTouch && f.ctrl !== 'cpu' ? 'SOLO PRONTO!' : f.ctrl === 'cpu' ? 'SOLO PRONTO!' : `SOLO PRONTO! [${f.ctrl === 'p2' ? 'I' : 'T'}]`, L ? mx + mw + 12 : mx - 12, my + 7, 20, '#ffffff', '#29b8ff', L ? 'left' : 'right', 4); c.restore(); }
     else comicText(c, 'STAR POWER', L ? mx + mw + 10 : mx - 10, my + 7, 15, '#bfefff', '#29b8ff', L ? 'left' : 'right', 3.5);
+    // torcida meter
+    const T = f.def.torcida, ty = 134;
+    comicText(c, T.name, L ? mx : mx + mw, ty, 15, '#ffffff', '#ffd9a0', L ? 'left' : 'right', 3.5);
+    c.fillStyle = '#0a0a18'; c.fillRect(mx - 2, ty + 10, mw + 4, 11); c.lineWidth = 2.5; c.strokeStyle = OUT; c.strokeRect(mx - 2, ty + 10, mw + 4, 11);
+    const cw = mw * f.cheer / 100; c.fillStyle = f.cheer > 80 ? '#ffffff' : T.col; c.fillRect(L ? mx : mx + mw - cw, ty + 12, cw, 7);
     portrait(c, f.def, L ? 62 : W - 62, 58, 46, !L);
   }
   // timer badge
@@ -1541,6 +1594,8 @@ function renderFight() {
     mode: 'fight', t: game.t, beat: music.beat, excite: game.excite, dark: !!game.solo, shake: game.shake,
     flash: game.flash, flashPos: game.flashPos, cam: fightCam(), actors: [f1.look(), f2.look()], projs,
     cameo: game.cameo, items,
+    torcidas: [leaderLook(0), leaderLook(1)],
+    cheer: [0, 1].map(i => clamp((i ? f2 : f1).cheer / 100 * 0.5 + game.boost[i] + game.excite * 0.3, 0, 1.4)),
   });
   // sparks, fire, comic pops and lightning live on the fight plane: draw them through the camera
   const T = r3.planeTransform((f1.x + f2.x) / 2, 420);
@@ -1551,6 +1606,8 @@ function renderFight() {
   c.setTransform(scale, 0, 0, scale, 0, 0);
   if (game.solo) drawSoloOverlay(c);
   drawHUD(c);
+  drawShouts(c);
+  drawTorcidaIntro(c);
   if (game.cameo && game.cameo.t < 130) {
     const k = clamp(Math.min(game.cameo.t, 130 - game.cameo.t) / 12, 0, 1);
     c.save(); c.globalAlpha = k; c.translate(W / 2, 162); c.rotate(-0.02);
@@ -1574,6 +1631,32 @@ function renderFight() {
     ['CONTINUAR', 'SAIR PARA O MENU'].forEach((s, i) => comicText(c, (game.pauseSel === i ? '▶ ' : '') + s, W / 2, 340 + i * 90, game.pauseSel === i ? 56 : 44, '#ffffff', game.pauseSel === i ? '#ffd400' : '#8a8a9a'));
     drawControlsHelp(c, 560);
   }
+}
+// the leader's shout: a big comic burst on that fighter's half of the screen
+function drawShouts(c) {
+  for (const s of game.shouts) {
+    const age = s.t, k = age < 7 ? lerp(0.3, 1.18, age / 7) : age < 12 ? lerp(1.18, 1, (age - 7) / 5) : 1, fade = clamp((95 - age) / 15, 0, 1);
+    const long = s.text.length > 12, x = s.side === 0 ? 330 : 950;
+    c.save(); c.translate(x, 245 + Math.sin(age * 0.5) * 3); c.rotate((s.side ? 0.07 : -0.07)); c.scale(k, k); c.globalAlpha = fade;
+    starburst(c, long ? 185 : 150, long ? 138 : 110, 14); inked(c, s.col, 6);
+    comicText(c, s.text, 0, 6, long ? 38 : 56, '#ffffff', '#ffd400', 'center', 8);
+    comicText(c, s.who + ' GRITA:', 0, long ? -52 : -44, 17, '#ffffff', '#ffe9a0', 'center', 4);
+    c.restore();
+  }
+}
+// round 1 only: the two torcidas are introduced with their leaders
+function drawTorcidaIntro(c) {
+  if (game.phase !== 'intro' || game.round !== 1 || game.phaseT > 130) return;
+  const pt = game.phaseT, k = ease(Math.min(pt, 14) / 14) * (pt > 110 ? 1 - (pt - 110) / 20 : 1);
+  [game.f1, game.f2].forEach((f, i) => {
+    const T = f.def.torcida, w = 470, h = 78, x = i ? W - 18 - w : 18, y = 596, off = (1 - k) * (i ? 1 : -1) * 520;
+    c.save(); c.translate(x + off, y);
+    c.beginPath(); if (i) { c.moveTo(24, 0); c.lineTo(w, 0); c.lineTo(w, h); c.lineTo(0, h); } else { c.moveTo(0, 0); c.lineTo(w - 24, 0); c.lineTo(w, h); c.lineTo(0, h); } c.closePath();
+    inked(c, T.col, 6);
+    comicText(c, T.name, w / 2, 27, 36, '#ffffff', '#ffd400', 'center', 6);
+    comicText(c, 'comandada por ' + T.leader, w / 2, 58, 21, '#ffffff', '#ffe9a0', 'center', 4);
+    c.restore();
+  });
 }
 function drawControlsHelp(c, y) {
   const lines = game.mode === 2
@@ -1717,6 +1800,8 @@ function renderSelect() {
       c.font = `20px ${FONT}`; c.textAlign = 'left'; c.fillStyle = '#fff'; c.fillText(n, sx, sy + 7);
       for (let j = 0; j < 5; j++) { c.beginPath(); c.rect(sx + 136 + j * 14, sy - 8, 10, 16); inked(c, j < v ? d.accent : '#333', 2); }
     });
+    comicText(c, d.torcida.name, x, 586, 24, '#ffffff', d.torcida.col, 'center', 5);
+    comicText(c, 'puxada por ' + d.torcida.leader, x, 608, 15, '#ffffff', '#ffe9a0', 'center', 3.5);
     c.save(); c.font = `17px ${FONT}`; c.textAlign = 'right'; c.lineWidth = 4; c.strokeStyle = OUT; c.fillStyle = '#fff3b0';
     d.moves.forEach((m, k) => { c.strokeText(m, x + 250, 254 + k * 24); c.fillText(m, x + 250, 254 + k * 24); }); c.restore();
     if (sel) { c.save(); c.translate(x, 650 + Math.sin(t * 0.2) * 4); starburst(c, 34, 26, 10); inked(c, '#e3121c', 4); comicText(c, 'J1', 0, 2, 30, '#fff', '#ffd400'); c.restore(); }
