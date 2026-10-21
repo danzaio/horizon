@@ -10,6 +10,10 @@ Tudo é procedural: **nenhuma textura, fonte ou áudio externo**; funciona offli
 Jogo de luta satírico entre caricaturas do Lula e do Flávio, no estilo de *Guitar Hero III: Legends of Rock*: luta em **3D com Three.js** (toon shading em 3 tons, hachura de nanquim no shader, contorno por casco invertido, palco com treliças, amplificadores, bateria, feixes de luz volumétricos, plateia e o Congresso ao fundo) e telas de título/VS em **ilustração 2D**, como as telas de loading do GH3. Música e efeitos 100% procedurais (WebAudio). É paródia, só um jogo.
 
 * `npm run dev` → http://localhost:5173/luta/ (no build: `dist/luta/index.html`, publicado junto no GitHub Pages).
+* **Jogar online de qualquer PC/celular:**
+  * *GitHub Pages*: depois do merge na `main`, o workflow publica em https://danzaio.github.io/horizon/luta/ (link permanente).
+  * *Link temporário na hora*: `npm run luta:online` sobe o jogo e um túnel público (usa `cloudflared` se estiver instalado, senão `localtunnel` via npx) e imprime a URL para mandar a quem for jogar.
+  * *Um arquivo só*: `npm run build:luta` gera `dist-luta/index.html` (~690 kB, tudo embutido): abre com duplo clique, ou é só jogar em qualquer hospedagem estática.
 * **1 jogador** (contra a CPU) ou **2 jogadores** no mesmo teclado; controles de toque no celular.
 * Melhor de 3 rounds, 99 s. Bater/apanhar enche o **star power**: ¼ libera um especial, cheio libera o **SOLO** — um mini Guitar Hero de 3 trilhas (F/G/H) em que cada nota acertada solta um raio no adversário.
 

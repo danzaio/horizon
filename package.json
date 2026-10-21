@@ -7,7 +7,9 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 5173",
     "build": "vite build",
-    "preview": "vite preview --host 0.0.0.0 --port 4173"
+    "preview": "vite preview --host 0.0.0.0 --port 4173",
+    "build:luta": "vite build -c vite.luta.config.js",
+    "luta:online": "bash scripts/luta-online.sh"
   },
   "dependencies": {
     "three": "0.186.1"
