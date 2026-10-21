@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#060914">
+  <meta name="description" content="HORIZON — um mundo de blocos com horizonte infinito, feito em Three.js.">
+  <title>HORIZON</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%230b1030'/%3E%3Crect y='9' width='16' height='7' fill='%235e9d34'/%3E%3Crect x='10' y='4' width='4' height='4' fill='%23ffb454'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/src/ui/style.css">
+</head>
+<body>
+  <canvas id="game" tabindex="-1"></canvas>
+
+  <!-- HUD -->
+  <div id="hud" class="hidden">
+    <div id="crosshair"><i></i><i></i></div>
+    <div id="mini-fps" class="hidden">0 FPS</div>
+    <div id="toasts"></div>
+    <div id="hotbar-name"></div>
+    <div id="hotbar"></div>
+    <div id="fly-badge" class="hidden">VOO</div>
+    <div id="planet-badge" class="hidden"></div>
+    <div id="toolbar"></div>
+    <div id="hud-layer"></div>
+    <div id="water-vignette" class="hidden"></div>
+  </div>
+
+  <!-- Debug (F3) -->
+  <pre id="debug" class="hidden"></pre>
+  <canvas id="spark" class="hidden" width="240" height="44"></canvas>
+
+  <!-- Touch controls -->
+  <div id="touch" class="hidden">
+    <div id="joy"><div id="joy-knob"></div></div>
+    <button class="tbtn" data-act="jump" id="t-jump">▲</button>
+    <button class="tbtn" data-act="fly" id="t-fly">✈</button>
+    <button class="tbtn" data-act="down" id="t-down">▼</button>
+    <button class="tbtn big" data-act="break" id="t-break">⛏</button>
+    <button class="tbtn big" data-act="place" id="t-place">▣</button>
+    <button class="tbtn small" data-act="menu" id="t-menu">☰</button>
+    <button class="tbtn small" data-act="palette" id="t-pal">▦</button>
+  </div>
+
+  <!-- Block palette (E) -->
+  <div id="palette" class="overlay hidden">
+    <div class="panel wide">
+      <div class="panel-head"><h2>Blocos</h2><span class="dim">Clique para colocar no slot selecionado · E ou Esc para fechar</span></div>
+      <div id="palette-grid"></div>
+    </div>
+  </div>
+
+  <!-- Feature panels are created at runtime (ui.panel) -->
+  <div id="panels"></div>
+
+  <!-- Main menu -->
+  <div id="menu" class="overlay">
+    <canvas id="backdrop"></canvas>
+    <div class="menu-col">
+      <canvas id="title" width="400" height="64" aria-label="HORIZON"></canvas>
+      <p class="tagline">horizonte infinito · mundo de blocos · zero downloads</p>
+      <div class="panel menu-panel">
+        <label class="field"><span>Seu nome</span>
+          <input id="player-name" type="text" maxlength="20" placeholder="como te chamam por aí" autocomplete="off" spellcheck="false">
+        </label>
+        <label class="field"><span>Semente do mundo</span>
+          <input id="seed" type="text" placeholder="vazio = o seu planeta" autocomplete="off" spellcheck="false">
+        </label>
+        <label class="field"><span>Qualidade gráfica</span>
+          <select id="menu-quality"></select>
+        </label>
+        <button id="play" class="btn primary">Jogar no meu planeta</button>
+        <div id="menu-actions" class="menu-actions"></div>
+        <div id="menu-note" class="note"></div>
+      </div>
+      <div class="panel keys" id="keys-sheet">
+        <div class="keys-grid">
+          <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> mover</span>
+          <span><kbd>Espaço</kbd> pular / nadar</span>
+          <span><kbd>Shift</kbd> correr</span>
+          <span><kbd>Ctrl</kbd>/<kbd>C</kbd> agachar / descer</span>
+          <span><kbd>F</kbd> voar (ou 2× <kbd>Espaço</kbd>)</span>
+          <span><kbd>Botão esq.</kbd> quebrar</span>
+          <span><kbd>Botão dir.</kbd> colocar</span>
+          <span><kbd>Meio</kbd> pegar bloco</span>
+          <span><kbd>1</kbd>–<kbd>9</kbd> / roda: hotbar</span>
+          <span><kbd>E</kbd> blocos</span>
+          <span><kbd>T</kbd> hora do dia</span>
+          <span><kbd>L</kbd> lanterna · <kbd>K</kbd> clima · <kbd>P</kbd> modo foto</span>
+          <span><kbd>F3</kbd> debug · <kbd>F2</kbd> foto · <kbd>M</kbd> mudo</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div id="loading" class="overlay hidden">
+    <div class="load-box">
+      <div class="load-title">Gerando o mundo…</div>
+      <div class="bar"><div id="load-bar"></div></div>
+      <div id="load-text" class="dim">Preparando</div>
+      <div id="load-tip" class="tip"></div>
+    </div>
+  </div>
+
+  <!-- Pause / settings -->
+  <div id="pause" class="overlay hidden">
+    <div class="panel settings">
+      <div class="panel-head"><h2>Pausado</h2><span class="dim">HORIZON</span></div>
+      <div class="rows">
+        <label class="row"><span>Qualidade</span><select id="set-quality"></select></label>
+        <label class="row"><span>Distância de visão <b id="v-view"></b></span><input id="set-view" type="range" min="25" max="200" step="5"></label>
+        <label class="row"><span>Campo de visão <b id="v-fov"></b></span><input id="set-fov" type="range" min="50" max="110" step="1"></label>
+        <label class="row"><span>Sensibilidade <b id="v-sens"></b></span><input id="set-sens" type="range" min="10" max="300" step="5"></label>
+        <label class="row"><span>Volume <b id="v-vol"></b></span><input id="set-vol" type="range" min="0" max="100" step="1"></label>
+        <label class="row"><span>Velocidade do tempo <b id="v-time"></b></span><input id="set-time" type="range" min="0" max="100" step="1"></label>
+        <label class="row check"><span>Mostrar FPS</span><input id="set-fps" type="checkbox"></label>
+        <details class="fx"><summary>Efeitos avançados <span class="dim">(desligue o que pesar)</span></summary><div id="fx-list" class="fx-list"></div></details>
+      </div>
+      <div class="btn-row">
+        <button id="resume" class="btn primary">Continuar</button>
+        <button id="shot" class="btn">Capturar tela</button>
+        <button id="quit" class="btn ghost">Menu principal</button>
+        <button id="wipe" class="btn ghost danger" title="Apaga as construções e a posição salvas desta semente">Apagar mundo salvo</button>
+      </div>
+      <div class="note" id="pause-note">Clique em “Continuar” para voltar ao jogo.</div>
+    </div>
+  </div>
+
+  <div id="fatal" class="overlay hidden"><div class="panel"><h2>Ops!</h2><p id="fatal-text"></p></div></div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

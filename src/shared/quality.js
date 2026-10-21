@@ -1,0 +1,11 @@
+// Quality presets shared by world (view distance, upload budget), renderer (shadows, post, ...) and game (auto-quality).
+export const QUALITY_ORDER = ['potato', 'low', 'medium', 'high', 'ultra'];
+const hc = (typeof navigator !== 'undefined' && navigator.hardwareConcurrency) || 4;
+export const PRESETS = {
+  potato: { precip: 0, mobs: 4, label: 'Batata', renderScale: 0.5,  viewDistance: 640,   chunkRadius: 3,  lodFactor: 1.5, shadows: { on: false, size: 0,    radius: 0 },   post: { on: false, bloom: false, godrays: false, fxaa: false }, clouds: 0, waterFX: 0, skyDetail: 0, wind: false, meshUploadMs: 2.0, workers: Math.max(1, Math.min(2, hc - 1)) },
+  low:    { precip: 600, mobs: 10, label: 'Baixo',  renderScale: 0.75, viewDistance: 1280,  chunkRadius: 5,  lodFactor: 1.7, shadows: { on: false, size: 0,    radius: 0 },   post: { on: false, bloom: false, godrays: false, fxaa: false }, clouds: 1, waterFX: 1, skyDetail: 1, wind: true,  meshUploadMs: 2.5, workers: Math.max(1, Math.min(3, hc - 1)) },
+  medium: { precip: 1800, mobs: 20, label: 'Médio',  renderScale: 1.0,  viewDistance: 2560,  chunkRadius: 7,  lodFactor: 1.9, shadows: { on: true,  size: 1024, radius: 48 },  post: { on: true,  bloom: false, godrays: false, fxaa: true, exp: true },  clouds: 1, waterFX: 1, skyDetail: 2, wind: true,  meshUploadMs: 3.0, workers: Math.max(2, Math.min(4, hc - 1)) },
+  high:   { precip: 3200, mobs: 32, label: 'Alto',   renderScale: 1.0,  viewDistance: 5120,  chunkRadius: 10, lodFactor: 2.0, shadows: { on: true,  size: 2048, radius: 80 },  post: { on: true,  bloom: true,  godrays: true,  fxaa: true,  ssao: true,  ssr: true, taa: true, vol: true, exp: true, flare: true, cine: true },  clouds: 2, waterFX: 2, skyDetail: 2, wind: true,  meshUploadMs: 3.5, workers: Math.max(2, Math.min(6, hc - 1)) },
+  ultra:  { precip: 5200, mobs: 48, label: 'Ultra',  renderScale: 1.0,  viewDistance: 12288, chunkRadius: 14, lodFactor: 2.2, shadows: { on: true,  size: 4096, radius: 128 }, post: { on: true,  bloom: true,  godrays: true,  fxaa: true,  ssao: true,  ssr: true, taa: true, vol: true, exp: true, flare: true, cine: true, mb: true },  clouds: 3, waterFX: 2, skyDetail: 2, wind: true,  meshUploadMs: 4.0, workers: Math.max(2, Math.min(8, hc - 1)) },
+};
+export const getPreset = name => PRESETS[name] || PRESETS.medium;
