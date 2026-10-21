@@ -3,16 +3,19 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "HORIZON — infinite-view voxel world in Three.js (Distant-Horizons-style LOD, custom shaders, potato-friendly)",
+  "description": "HORIZON \u2014 infinite-view voxel world in Three.js (Distant-Horizons-style LOD, custom shaders, potato-friendly)",
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 5173",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0 --port 4173"
   },
   "dependencies": {
+    "@trystero-p2p/mqtt": "^0.26.0",
+    "@trystero-p2p/torrent": "^0.26.0",
     "qrcode-generator": "^2.0.4",
     "three": "0.186.1",
-    "trystero": "^0.26.0"
+    "trystero": "^0.26.0",
+    "@trystero-p2p/nostr": "^0.26.0"
   },
   "devDependencies": {
     "playwright-core": "^1.50.0",

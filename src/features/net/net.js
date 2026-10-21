@@ -90,7 +90,17 @@ export class Net {
     const useT = o.trystero !== false && urlFlag('nettrystero') !== '0' && rtcAvailable();
     if (useT) {
       info.trystero = 'connecting';
-      trysteroHost(code, (tr) => this.accept(tr, 'trystero')).then((h) => { if (this.role === 'host' && this.hostInfo === info) { this._tryst = h; info.trystero = 'on'; } else h.stop(); })
+      trysteroHost(code, (tr) => this.accept(tr, 'trystero')).then((h) => {
+        if (this.role === 'host' && this.hostInfo === info) {
+          this._tryst = h; info.trystero = 'connecting';
+          const poll = () => {   // report REAL connectivity of the public rendezvous networks, not just "we asked"
+            if (this._tryst !== h || this.hostInfo !== info) { clearInterval(iv); return; }
+            const st = h.status(), state = st.open > 0 ? 'on' : 'connecting', txt = st.text;
+            if (state !== info.trystero || txt !== info.relays) { info.trystero = state; info.relays = txt; this.events.emit('net:hostInfo', info); }
+          };
+          const iv = setInterval(poll, 1500); poll();
+        } else h.stop();
+      })
         .catch((e) => { info.trystero = 'failed'; info.trysteroError = e && e.message ? e.message : String(e); console.warn('[HZ] trystero host failed:', e); })
         .finally(() => this.events.emit('net:hostInfo', info));
     }

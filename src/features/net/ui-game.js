@@ -44,7 +44,12 @@ export function openNetPanel(ctx, net) {
     const can = canHost();
     const seg = h('div', { class: 'nt-dome' }, MODES.map((o) => h('button', { type: 'button', 'data-m': o.m, class: mode === o.m ? 'on' : '', disabled: !can && o.m !== 'closed', style: !can && o.m !== 'closed' ? 'opacity:.4;cursor:not-allowed' : '', onclick: () => net.dome.set(o.m) },
       h('span', { class: 'ic', text: o.ic }), h('b', { text: o.name }), h('span', { class: 'd', text: o.d }))));
-    const kids = [seg, h('p', { text: MODE_TXT[mode] })];
+    const kids = [];
+    if (can && mode === 'closed') kids.push(h('button', { class: 'btn primary', type: 'button', style: 'width:100%;margin-bottom:10px', text: '🔗 Convidar um amigo (abre o domo e copia o link)', onclick: async () => {
+      net.dome.set('open');
+      setTimeout(async () => { const l = net.hostInfo && net.hostInfo.link; if (!l) { ui.toast('Abrindo o domo… tente de novo em 2 s'); return; } try { await navigator.clipboard.writeText(l); ui.toast('Link copiado! Mande para o seu amigo — ele só precisa abrir.'); } catch { ui.toast('Link: ' + l); } }, 200);
+    } }));
+    kids.push(seg, h('p', { text: MODE_TXT[mode] }));
     if (!can) kids.push(h('p', { class: 'nt-warn', text: NO_HOST_TEXT }));
     else if (!rtcAvailable()) kids.push(h('p', { class: 'nt-warn', text: 'Este navegador/ambiente não permite WebRTC (ex.: dentro do Artifact do Claude): só abas do mesmo navegador conseguem entrar.' }));
     if (info && mode !== 'closed') {
@@ -52,7 +57,7 @@ export function openNetPanel(ctx, net) {
       if (!qrCache.has(info.link)) qrCanvas(info.link, 150).then((c) => { if (c) { qrCache.set(info.link, c); qrSlot.append(c); } }); else qrSlot.append(qrCache.get(info.link));
       kids.push(h('h3', { text: 'Convidar' }),
         h('div', { class: 'nt-row' }, h('span', { class: 'nt-code', text: info.code }), copyButton('Copiar código', () => info.code, ui), copyButton('Copiar link', () => info.link, ui)), qrSlot,
-        h('p', { class: 'nt-warn', text: 'Código curto: ' + (info.trystero === 'on' ? 'rede pública de sinalização conectada (funciona com qualquer amigo).' : info.trystero === 'connecting' ? 'conectando à rede pública de sinalização…' : info.trystero === 'failed' ? 'rede pública indisponível (' + info.trysteroError + '). Use o modo manual abaixo.' : 'rede pública desligada: só abas do mesmo navegador. Use o modo manual para amigos.') }));
+        h('p', { class: 'nt-warn', text: 'Código curto: ' + (info.trystero === 'on' ? 'rede pública de sinalização conectada (' + (info.relays || '') + ') — funciona com qualquer amigo.' : info.trystero === 'connecting' ? 'conectando à rede pública de sinalização… ' + (info.relays || '') + ' (se ficar em 0/…, sua rede bloqueia: use o modo manual)' : info.trystero === 'failed' ? 'rede pública indisponível (' + info.trysteroError + '). Use o modo manual abaixo.' : 'rede pública desligada: só abas do mesmo navegador. Use o modo manual para amigos.') }));
       if (mode === 'invite') kids.push(inviteBox());
       kids.push(manualBox());
     }

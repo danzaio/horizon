@@ -1,0 +1,24 @@
+#hz-ship-hud { position: fixed; inset: 0; pointer-events: none; z-index: 5; font-family: ui-monospace, Menlo, Consolas, monospace; color: #cfeeff; }
+#hz-ship-hud.hidden { display: none; }
+#hz-ship-hud kbd { background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.25); border-radius: 4px; padding: 0 4px; font-size: .85em; }
+.hz-cross { position: absolute; left: 50%; top: 50%; width: 34px; height: 34px; transform: translate(-50%,-50%); border: 2px solid rgba(255,90,110,.85); border-radius: 50%; box-shadow: 0 0 8px rgba(255,60,90,.5), inset 0 0 6px rgba(255,60,90,.25); }
+.hz-cross::before, .hz-cross::after { content: ''; position: absolute; left: 50%; top: 50%; background: rgba(255,90,110,.9); }
+.hz-cross::before { width: 8px; height: 2px; transform: translate(-50%,-50%); } .hz-cross::after { width: 2px; height: 8px; transform: translate(-50%,-50%); }
+.hz-readout { position: absolute; left: 50%; bottom: 19%; transform: translateX(-50%); text-align: center; text-shadow: 0 0 8px rgba(80,200,255,.7); min-width: 220px; }
+.hz-readout .spd b { font-size: 34px; letter-spacing: 1px; } .hz-readout .spd small { margin-left: 6px; opacity: .7; }
+.hz-readout .alt { opacity: .85; margin: 2px 0 6px; }
+.hz-readout .bar { height: 7px; border-radius: 4px; background: rgba(0,0,0,.45); border: 1px solid rgba(120,220,255,.4); overflow: hidden; }
+.hz-readout .bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #3aa8ff, #7af0ff); transition: width .1s linear; }
+.hz-readout .bar i.boost { background: linear-gradient(90deg, #ff8a3c, #ffe27a); }
+.hz-readout .orbit { margin-top: 8px; padding: 4px 10px; border-radius: 6px; background: rgba(40,20,90,.55); border: 1px solid rgba(190,150,255,.6); color: #e7d7ff; animation: hzpulse 1.6s ease-in-out infinite; }
+.hz-readout .orbit.hidden { display: none; }
+@keyframes hzpulse { 50% { box-shadow: 0 0 14px rgba(190,150,255,.6); } }
+.hz-hints { position: absolute; left: 50%; top: 58px; transform: translateX(-50%); font-size: 12px; opacity: .75; background: rgba(0,0,0,.35); padding: 4px 10px; border-radius: 6px; white-space: nowrap; }
+/* cockpit frame (1st person) */
+.hz-canopy { position: absolute; inset: 0; }
+.hz-canopy i { position: absolute; background: linear-gradient(180deg, #11151c, #232a36); box-shadow: 0 0 24px rgba(0,0,0,.7); }
+.hz-canopy .a { left: 0; right: 0; bottom: 0; height: 15%; clip-path: polygon(0 40%, 18% 0, 82% 0, 100% 40%, 100% 100%, 0 100%); }
+.hz-canopy .b { left: 0; right: 0; top: 0; height: 7%; clip-path: polygon(0 0, 100% 0, 92% 100%, 8% 100%); }
+.hz-canopy .c { left: 0; top: 0; bottom: 0; width: 7%; clip-path: polygon(0 0, 100% 12%, 55% 100%, 0 100%); }
+.hz-canopy .d { right: 0; top: 0; bottom: 0; width: 7%; clip-path: polygon(0 12%, 100% 0, 100% 100%, 45% 100%); }
+@media (max-width: 700px) { .hz-hints { display: none; } }

@@ -2,7 +2,12 @@
 // Link = framing on top of a Transport: JSON objects, fragmentation of big messages, size caps and byte counters.
 import { MAX_FRAME, MAX_BIG } from './protocol.js';
 
-export const ICE_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun.cloudflare.com:3478' }];   // STUN only: no TURN, so some NATs will not connect
+// STUN finds the public address (works for most home routers); the community TURN relay is the fallback for CGNAT / symmetric NAT (very common on
+// mobile and many ISPs): the browser only uses it when a direct path fails, and everything stays DTLS-encrypted end to end.
+export const TURN_SERVERS = [
+  { urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:443', 'turn:openrelay.metered.ca:443?transport=tcp', 'turns:openrelay.metered.ca:443?transport=tcp'], username: 'openrelayproject', credential: 'openrelayproject' },
+];
+export const ICE_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }, { urls: 'stun:stun.cloudflare.com:3478' }, ...TURN_SERVERS];
 
 export class Transport {
   constructor(kind) { this.kind = kind; this.state = 'connecting'; this._l = { open: new Set(), close: new Set(), message: new Set() }; }

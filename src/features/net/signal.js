@@ -2,7 +2,7 @@
 //  * Manual   - invite/answer codes (compressed SDP + ICE) copied by hand or QR; 100% serverless.
 //  * Local    - BroadcastChannel lobby for tabs of the same browser (local multiplayer, automated tests).
 //  * Trystero - public BitTorrent/Nostr relays are only the rendezvous; short room code. NOT TESTED on the dev machine (no egress).
-import { LocalTransport, RtcTransport, Transport, makePeerConnection, ICE_SERVERS } from './transport.js';
+import { LocalTransport, RtcTransport, Transport, makePeerConnection, ICE_SERVERS, TURN_SERVERS } from './transport.js';
 import { randomString, ROOM_APP_ID } from './protocol.js';
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -201,47 +201,77 @@ export function localConnect(room, ms = 1800) {
 // ---------------------------------------------------------------------------------------------------------------------
 const PROBE = '\u0001probe', HOSTHERE = '\u0001host';
 class TrysteroTransport extends Transport {
-  constructor(drv, peerId) { super('trystero'); this.drv = drv; this.peerId = peerId; setTimeout(() => this._open(), 0); }
-  send(str) { if (this.state !== 'closed') this.drv.send(str, this.peerId); }
+  constructor(drv, peerId, via) { super('trystero'); this.drv = drv; this.peerId = peerId; this.via = via; setTimeout(() => this._open(), 0); }
+  send(str) { if (this.state !== 'closed') this.drv.send(str, this.peerId, this.via); }
   close(reason) { this.drv.forget(this.peerId); if (this.drv.mode === 'guest') this.drv.leave(); this._closed(reason); }
 }
 
+/** Rendezvous strategies, all joined at once: it is enough that ONE public network (Nostr relays, BitTorrent trackers, MQTT brokers) is reachable by both sides. */
+const STRATEGIES = [
+  ['nostr', () => import('@trystero-p2p/nostr')],
+  ['torrent', () => import('@trystero-p2p/torrent')],
+  ['mqtt', () => import('@trystero-p2p/mqtt')],
+];
+
 class TrysteroDriver {
-  constructor(room, mode, onPeer, joinImpl) { this.roomCode = room; this.mode = mode; this.onPeer = onPeer; this.joinImpl = joinImpl; this.peers = new Map(); this.room = null; this.sendFn = null; this.hostPeer = null; this.waiters = []; }
+  constructor(room, mode, onPeer, joinImpl) { this.roomCode = room; this.mode = mode; this.onPeer = onPeer; this.joinImpl = joinImpl; this.peers = new Map(); this.rooms = []; this.mods = []; this.sends = []; this.names = []; this.hostPeer = null; this.hostVia = -1; this.waiters = []; }
   async start() {
-    const joinRoom = this.joinImpl || (await import('trystero')).joinRoom;
-    this.room = joinRoom({ appId: ROOM_APP_ID, password: 'hz-' + this.roomCode, relayConfig: { warnOnRelayFailure: false } }, this.roomCode);
-    const act = this.room.makeAction('hz');
-    const quiet = (r) => { if (r && r.catch) r.catch(() => {}); };           // a peer that just left must not surface as an unhandled rejection
-    if (Array.isArray(act)) { this.sendFn = (d, id) => quiet(act[0](d, id)); act[1]((d, id) => this._recv(d, id)); }          // older tuple-style API
-    else { this.sendFn = (d, id) => quiet(act.send(d, { target: id })); act.onMessage = (d, ctx) => this._recv(d, ctx && ctx.peerId !== undefined ? ctx.peerId : ctx); }
-    const join = (id) => { if (this.mode === 'guest') this.sendFn(PROBE, id); };
-    this.room.onPeerJoin = join;
-    this.room.onPeerLeave = (id) => { const t = this.peers.get(id); if (t) { this.peers.delete(id); t._closed('peer-left'); } };
+    let impls;
+    if (this.joinImpl) impls = [['test', this.joinImpl]];
+    else {
+      impls = []; const errs = [];
+      await Promise.all(STRATEGIES.map(async ([name, load]) => { try { const mod = await load(); impls.push([name, mod.joinRoom]); this.mods.push([name, mod]); } catch (e) { errs.push(name + ': ' + (e && e.message ? e.message : e)); } }));
+      if (!impls.length) throw new Error(errs.join('; ') || 'nenhuma rede de sinalização disponível');
+    }
+    const cfg = { appId: ROOM_APP_ID, password: 'hz-' + this.roomCode, turnConfig: TURN_SERVERS, relayConfig: { warnOnRelayFailure: false } };
+    let lastErr = null;
+    for (const [name, joinRoom] of impls) {
+      try { this._wire(name, joinRoom(cfg, this.roomCode)); } catch (e) { lastErr = e; console.warn('[HZ] rendezvous', name, 'failed:', e); }
+    }
+    if (!this.rooms.length) throw lastErr || new Error('sem sinalização');
     return this;
   }
-  send(str, id) { try { this.sendFn(str, id); } catch (e) { console.warn('[HZ] trystero send failed', e); } }
+  _wire(name, room) {
+    const idx = this.rooms.length; this.rooms.push(room); this.names.push(name);
+    const act = room.makeAction('hz');
+    const quiet = (r) => { if (r && r.catch) r.catch(() => {}); };           // a peer that just left must not surface as an unhandled rejection
+    if (Array.isArray(act)) { this.sends[idx] = (d, id) => quiet(act[0](d, id)); act[1]((d, id) => this._recv(d, id, idx)); }          // older tuple-style API
+    else { this.sends[idx] = (d, id) => quiet(act.send(d, { target: id })); act.onMessage = (d, ctx) => this._recv(d, ctx && ctx.peerId !== undefined ? ctx.peerId : ctx, idx); }
+    room.onPeerJoin = (id) => { if (this.mode === 'guest') this.sends[idx](PROBE, id); };
+    room.onPeerLeave = (id) => { const t = this.peers.get(id); if (t && t.via === idx) { this.peers.delete(id); t._closed('peer-left'); } };
+  }
+  send(str, id, via) { try { const f = this.sends[via >= 0 ? via : 0]; f(str, id); } catch (e) { console.warn('[HZ] trystero send failed', e); } }
   forget(id) { this.peers.delete(id); }
-  _recv(d, id) {
+  _recv(d, id, idx) {
     if (typeof d !== 'string') return;
     if (this.mode === 'host') {
-      if (d === PROBE) { this.send(HOSTHERE, id); if (!this.peers.has(id)) { const t = new TrysteroTransport(this, id); this.peers.set(id, t); this.onPeer(t); } return; }
-      const t = this.peers.get(id); if (t) t._emit('message', d, true);
+      if (d === PROBE) { this.send(HOSTHERE, id, idx); if (!this.peers.has(id)) { const t = new TrysteroTransport(this, id, idx); this.peers.set(id, t); this.onPeer(t); } return; }
+      const t = this.peers.get(id); if (t && t.via === idx) t._emit('message', d, true);
     } else {
-      if (d === HOSTHERE && !this.hostPeer) { this.hostPeer = id; const t = new TrysteroTransport(this, id); this.peers.set(id, t); for (const w of this.waiters) w(t); this.waiters = []; return; }
-      if (id === this.hostPeer) { const t = this.peers.get(id); if (t) t._emit('message', d, true); }
+      if (d === HOSTHERE && !this.hostPeer) { this.hostPeer = id; this.hostVia = idx; const t = new TrysteroTransport(this, id, idx); this.peers.set(id, t); for (const w of this.waiters) w(t); this.waiters = []; return; }
+      if (id === this.hostPeer && idx === this.hostVia) { const t = this.peers.get(id); if (t) t._emit('message', d, true); }
     }
   }
-  leave() { try { this.room && this.room.leave(); } catch { /* ignore */ } this.room = null; for (const t of this.peers.values()) t._closed('left'); this.peers.clear(); }
+  /** how many public relays / trackers / brokers are really connected right now */
+  status() {
+    let open = 0, total = 0; const parts = [], label = { nostr: 'Nostr', torrent: 'Torrent', mqtt: 'MQTT' };
+    for (const [name, mod] of this.mods) {
+      let o = 0, t = 0;
+      try { const socks = mod.getRelaySockets ? mod.getRelaySockets() : {}; for (const k of Object.keys(socks)) { const x = socks[k]; t++; if (x && (x.readyState === 1 || x.connected === true)) o++; } } catch { /* ignore */ }
+      open += o; total += t; parts.push((label[name] || name) + ' ' + o + '/' + t);
+    }
+    return { open, total, text: parts.join(' · ') };
+  }
+  leave() { for (const r of this.rooms) { try { r.leave(); } catch { /* ignore */ } } this.rooms = []; for (const t of this.peers.values()) t._closed('left'); this.peers.clear(); }
 }
 
 /** Host advertises `room` on the public relays. @returns {Promise<{stop():void}>} */
 export async function trysteroHost(room, onPeer, joinImpl) {
   const d = await new TrysteroDriver(room, 'host', onPeer, joinImpl).start();
-  return { stop: () => d.leave() };
+  return { stop: () => d.leave(), status: () => d.status() };
 }
 /** Guest looks for the host of `room`. @returns {Promise<Transport>} (rejects with a friendly Error after `ms`) */
-export async function trysteroConnect(room, ms = 25000, joinImpl) {
+export async function trysteroConnect(room, ms = 40000, joinImpl) {
   let d;
   try { d = await new TrysteroDriver(room, 'guest', null, joinImpl).start(); } catch (e) { throw new Error('Não foi possível usar a rede pública de sinalização (' + (e && e.message ? e.message : e) + ').'); }
   return new Promise((res, rej) => {
