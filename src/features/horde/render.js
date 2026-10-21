@@ -30,7 +30,7 @@ const CORNERS = [
   [[0, 0, 0], [1, 0, 0], [1, 0, 1], [0, 0, 1]], [[0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]], [[1, 0, 0], [0, 0, 0], [0, 1, 0], [1, 1, 0]],
 ];
 
-function build(def) {
+export function build(def) {
   const pos = [], nrm = [], col = [], piv = [], idx = [];
   for (const [x0, y0, z0, x1, y1, z1, c, part] of def.boxes) {
     const pv = part >= 1 && part <= 4 ? [(x0 + x1) / 2, y1, (z0 + z1) / 2] : part === 5 ? [-3, 11.9, -0.5] : part === 6 ? [3, 11.9, -0.5] : [0, 0, 0];
@@ -46,7 +46,7 @@ function build(def) {
   return { pos, nrm, col, piv, idx };
 }
 
-const VS = /* glsl */`
+export const VS = /* glsl */`
 ${UNIFORMS}
 attribute vec3 aN; attribute vec3 aC; attribute vec4 aPiv;
 attribute vec4 iA;   // xyz = position relative to the camera, w = yaw
@@ -73,7 +73,7 @@ void main(){
   gl_Position = projectionMatrix * vec4(mat3(viewMatrix) * rel, 1.0);
 }`;
 
-const FS = /* glsl */`
+export const FS = /* glsl */`
 ${UNIFORMS}
 ${NOISE}
 ${SKY_FN}
@@ -94,7 +94,7 @@ void main(){
   ${OUTPUT}
 }`;
 
-const MAX = 80;
+export const MAX = 80;
 
 export class HordeRender {
   /** @param {object} shared GameRenderer.shared uniforms */

@@ -1,66 +1,47 @@
 # HORIZON — memória viva do projeto
 
-> Arquivo de memória. Eu (orquestrador) releio no começo de cada rodada e atualizo no fim.
-> Última atualização: 2026-10-21 21:32 UTC (4 agentes concluídos e integrados; armas PvP/movimento prontos; push GitHub aguardando acesso do app Claude).
+> Releio no começo de cada rodada e atualizo no fim (pedido do usuário: "vai sempre lendo e atualizando memória").
+> Última atualização: 2026-10-21 ~01:05 UTC — tudo que o usuário pediu até agora está entregue e publicado.
 
 ## Visão (palavras do usuário)
-"No Man's Sky + Minecraft, online, rápido, fluido. Cada pessoa tem seu próprio planeta/Minecraft e pode abrir aos outros ou fechar (domo).
-Ferramentas fáceis para criar minigames, estilo Garry's Mod, tudo dentro do universo Minecraft."
-Hospedagem estática (github.io), P2P, sem servidor nosso. Roda em hardware batata. Português BR no chat.
+"No Man's Sky + Minecraft, online, rápido, fluido. Cada pessoa tem seu próprio planeta, pode abrir aos outros ou fechar (domo). Ferramentas fáceis para criar minigames estilo Garry's Mod."
+Hospedagem estática (github.io), P2P, sem servidor nosso, roda em hardware batata. Depois pediu: armas/PvP/dash/hooks, naves (1ª/3ª pessoa, piloto+artilheiro), horda estilo Helldivers, minimapa, salas públicas (sempre existentes), painel de admin, carro BYD Dolphin Mini, futebol, mais minigames, bichinhos estilo Pixelmon com batalhas PvP.
 
-## Preferências do usuário
-- Fala PT-BR informal. Respostas curtas, diretas, sem enrolação.
-- Já deixou claro: **eu NÃO estou no PC dele** (sessão na nuvem). Para publicar: comandos PowerShell ou ele cria o repo vazio e eu uso `add_repo`.
-- Subagentes Sonnet 5.5 liberados (até 4 em paralelo). Em rodadas de polish ele já pediu "inline sem subagents" — respeitar o que ele disser por último.
-- Quer mostrar para um amigo → link público (github.io). Quick tunnel é impossível neste sandbox (host trycloudflare bloqueado).
-- Pediu: "vai sempre lendo e atualizando memória" → manter este arquivo + `CLAUDE.md` em dia.
+## Preferências / regras do usuário
+- PT-BR informal, respostas curtas e diretas. **Trabalhar 100% inline, SEM subagentes** (ordem mais recente). Continuar relendo/atualizando esta memória.
+- Eu **não estou no PC dele** (sessão na nuvem). Site: **https://danzaio.github.io/horizon/** (repo `danzaio/horizon`, Pages por Actions). Ele quer o site sempre atualizado.
+- Nunca incluir identificador de modelo em commits/PRs/código; autor dos commits = `Claude <noreply@anthropic.com>`.
 
-## Estado do projeto
-- Engine voxel Three.js 0.186 / Vite, chunks 32×32×192, mesher greedy em workers, LOD quadtree (níveis 1–9), shaders (SSAO, SSR, nuvens, aurora, TAA, shafts, DOF…), presets potato→ultra + AutoQuality. Tudo testado em SwiftShader (sem GPU → sem FPS real).
-- Arquitetura de plugins (pronta, testada): `src/features/{events,registry,identity,permissions}.js`, features em `src/features/<nome>/index.js` (glob), contrato em `docs/CONTRACT2.md` (vinculante), rede em `docs/NET.md`.
-- Hotkeys reservados: E inventário, G ferramentas, J galáxia, U universo, O online, N rede, Y/M minigames.
-- Block ids: G 51–69, M 70–89.
+## Como publicar (IMPORTANTE)
+- O repo tem commits de OUTRA pessoa (jogo `/luta/` "Guitar Briga III", vite multi-page). **Nunca sobrescrever o repo com tar.**
+- Usar `/home/user/hz-publish.sh "mensagem"`: gera patch do que mudei desde o último publish (`/home/user/hz-last-pushed`) e aplica sobre `origin/main` em `/home/user/horizon-gh`, commit + push. Depois conferir `gh run list -R danzaio/horizon -L 1` (deploy ~1 min). `gh api .../pages` e curl no github.io são bloqueados no sandbox.
+- Build local de teste: `npx vite build --outDir $SP/int --emptyOutDir` + servidor estático `sh scripts/serve.sh $SP/int 5320` (`SP` = scratchpad da sessão). Single-file: `npx vite build -c vite.single.config.js` → `/home/user/horizon-jogo.html`.
 
-## Agentes em andamento (iniciados ~20:10, parada 21:45 UTC)
-| Agente | Pasta | Estado às 20:40 |
+## Mapa de features (src/features/*, carregadas por glob; `order` = ordem)
+| Feature | O que faz | Teclas / UI |
 |---|---|---|
-| U Universe | `src/features/universe/` | **CONCLUÍDO** (ver seção U abaixo) |
-| N Net | `src/features/net/` + `docs/NET.md` | **CONCLUÍDO** (ver seção N abaixo) |
-| G Items | `src/features/items/` | **CONCLUÍDO** (ver seção G abaixo; docs/ITEMS.md) |
-| M Minigame | `src/features/minigame/` | **CONCLUÍDO** (ver seção M abaixo; docs/MINIGAMES.md) |
+| net (5) | P2P WebRTC estrela host-autoritativo, domo, chat, avatares, salas públicas (lobby Trystero: Nostr+Torrent+MQTT, TURN de fallback), salas oficiais fixas (`publicRooms.js`), convite 1 clique | O painel · 🔗 convite · 🧭 ir ao amigo · menu "Salas públicas" · `?join=` `?pub=` |
+| items (10) | inventário, vida, combate, TNT, armas PvP (fuzil, escopeta, lança-mísseis, railgun, granada, mina, marreta, arpão, planador), dash/wall-jump/ground-pound | E inventário · V dash · C no ar slam |
+| universe (10) | endereços de planeta, 8 tipos, mapa galáctico, domo | J mapa |
+| ships (20) | naves 1ª/3ª pessoa, turbo, laser/míssil, artilheiro, órbita→salto | B · Z câmera |
+| cars (22) | BYD Dolphin Mini dirigível, passageiro | R · Espaço drift · X buzina |
+| horde (30) | ondas de monstros (rastejante, bruto, vespa, titã) | H / 👾 |
+| soccer (35) | estádio no céu, bola física, times, placar | I / ⚽ · U chuta |
+| minimap (40) | mapa redondo, zoom, amigos/monstros/nave | `-`/`=` zoom · `\` esconde |
+| critters (45) | 38 bichinhos, cápsulas, grupo/caixa/dex, batalha selvagem + PvP determinística | N / 🐾 · item Cápsula (E→Especiais) |
+| admin (50) | tempo, clima, regras, física, teleporte, jogadores, spawn, itens | F4 / 🛠 |
+| minigame (—) | editor + 12 templates (Y) | Y |
+Docs: `docs/CONTRACT2.md` (contrato), `NET.md`, `ITEMS.md`, `MINIGAMES.md`, `PLANETS.md`, `SHIPS_HORDE.md` (naves, horda, carro, futebol, minimapa, salas, bichinhos).
+Block ids: G 51–69 (TNT=51), M 70–89.
 
-Arquivos compartilhados que os agentes mexeram (revisar na integração): `shared/blocks.js`, `ui/ui.js`, `world/{mesher,terrain,chunk.worker,World,lodMesher,chunkGen}.js`, `game/{Controls,Interaction,Player,Particles,Audio}.js`.
+## Testes (rodar antes de publicar)
+`node src/features/{universe/address,universe/generator,minigame/minigame,critters/battle}.test.mjs` · `node scripts/nettest-unit.mjs` · `node src/game/{Player,AutoQuality}.test.mjs` · e2e: `node scripts/nettest.mjs --url=http://127.0.0.1:5320` (96 checks) · screenshots `scripts/shot.mjs`. Só WebGL por software (SwiftShader): FPS real não mensurável. Playwright resolve a partir do projeto (scripts em `scripts/` ou import por caminho absoluto de `node_modules/playwright-core`).
 
-## Checklist de integração (fazer quando os 4 terminarem)
-1. Ler os 4 relatórios finais; anotar divergências do CONTRACT2.
-2. `npm run build` + single-file build; zero erros no console.
-3. Teste de aceitação CONTRACT2 §5 (headless: 2 abas, BroadcastChannel LocalTransport).
-4. Soak/screenshot em potato/medium/ultra (regressão de perf do engine; terreno legado `profile:null` deve ficar idêntico).
-5. Conferir ids de bloco (sem colisão), hotkeys, Esc fecha painéis, ponteiro trava/destrava.
-6. Atualizar README (recursos novos, controles) e regenerar `/home/user/horizon-projeto.zip` + `/home/user/horizon-jogo.html`.
-7. Republicar Artifact (avisar: WebRTC não funciona dentro do Artifact, só no github.io).
-8. Publicar no GitHub (ver abaixo).
-
-## Publicação GitHub (pendente)
-- Bloqueado: criar repo via API/GraphQL não funciona nesta sessão; só repos já existentes via `add_repo`.
-- Entregues ao usuário: comandos PowerShell (`gh repo create horizon --public --source=. --push` + Pages por Actions) e opção B (ele cria repo vazio, confirma acesso do app em claude.ai/connect-github, eu faço push).
-- Quando o repo existir: `add_repo(owner, repo, access: push)` → clonar → copiar projeto → commit (sem identificador de modelo na mensagem) → push → `gh api -X POST repos/OWNER/horizon/pages -f build_type=workflow` → conferir `https://OWNER.github.io/horizon/`.
-- Workflow: `.github/workflows/pages.yml` (build + deploy).
-
-## Fatos do ambiente (não esquecer)
-- Só WebGL por software (SwiftShader). Static servers morrem quando o ambiente reinicia → `scripts/serve.sh <dir> <porta>`.
-- Scratchpad: `/tmp/claude-0/-home-user/909ae463-6711-55a8-ad26-4029f138c696/scratchpad/`.
-- Não é repositório git local. Entregáveis em `/home/user/`: `horizon-projeto.zip`, `horizon-jogo.html`, PNGs de showcase.
-- Hard stop dos agentes: 21:45 UTC. Data de hoje: 2026-10-21.
-
-## Backlog (oferecido, não começado)
-Guia de arquitetura/entrevista, vista X-ray, modo benchmark, gravador cinematográfico, merge de draw calls dos LODs, LICENSE (decisão do usuário).
-
-## Log
-- 20:10 — plumbing pronto, 4 agentes lançados.
-- 20:15 — respondi ao usuário sobre GitHub (PowerShell / opção B).
-- 20:36 — usuário pediu memória viva → criado `docs/MEMORY.md` e `CLAUDE.md`.
-- 20:58 — relatório de U recebido e registrado (agentes N, G, M ainda rodando).
+## Pendências / ideias
+- Nunca testado de verdade: rendezvous Trystero/lobby (sem egress aqui), TURN público, sala oficial pela internet.
+- Balanceamento (horda, bichinhos, armas), sons de monstros/bichinhos, ataque à distância de monstros, template Deathmatch, mobs ainda locais (não replicados), arenas de minigame ficam no mundo.
+- Bug do mouse após Esc: corrigido 2×, usuário deve confirmar.
+- LICENSE (decisão do usuário), vista X-ray, modo benchmark.
 
 ## U (Universe) — relatório final recebido
 - Endereços `XXXX-XXXX-XXXX` (Crockford b32: 6b galáxia, 18b sx, 18b sy, 3b planeta, misturador bijetivo, checksum 15b). Teste: 20k round-trips, 0 colisões, 100% dos erros de 1 caractere rejeitados.
@@ -134,3 +115,9 @@ Guia de arquitetura/entrevista, vista X-ray, modo benchmark, gravador cinematogr
 - 22:30 — **Minimapa** (src/features/minimap) e **Salas públicas** (lobby Trystero: signal.js lobbyJoin/sanitizeAd, net.setPublic, ui-lobby.js, botão no menu + checkbox no painel O). Unit tests do lobby ok (nettest-unit); e2e 96/96. Lobby real nunca testado (sem egress).
 - 22:40 — **Bug do mouse (causa real):** Esc não conta como gesto p/ pointer lock; o pedido de lock falhava e, com a ativação da tecla E ainda válida, o jogo entrava em 'drag mode' (cursor fixo na tela). Agora Controls.lock() não pede lock logo após Esc (soft: toast 'Clique na tela…'), só clique de mouse prova 'lock indisponível', e Esc na tela de pausa não retoma sozinho. Teste headless: E→Esc, O→Esc ficam playing/drag=false; clique recaptura.
 - 23:05 — **Mouse (2ª correção):** Controls.lockFailed() com retry (3 recusas por clique real → drag-look), dragMode sai sozinho no próximo clique que conseguir o lock. **Painel de admin** (F4 / 🛠, `src/features/admin/`): hora/velocidade/atalhos, clima (+automático), regras (deus, criativo, perms dos visitantes), física (gravidade, velocidade, voo), teleporte, jogadores (ir/trazer/curar/matar/expulsar via `adm:*`, aceitos só do host), animais, horda, explosão, nave, itens. **Salas públicas oficiais** (`net/publicRooms.js`): Praça Central, Arena da Horda, Arena PvP, Pista de Naves, Construção Livre — códigos fixos, planeta fixo; 1º a entrar vira host (aberto+listado, horda auto na arena), os demais entram; host saiu → `?pub=ID` reentra. Testado com 2 abas (host fixo HRDA-3AAA, guest entra, planet.publicRoom propaga). Pendente: **carros BYD Dolphin Mini** (cars/model.js feito, falta index.js: direção, câmera, réplica).
+- 23:20 — **Repo tem commits de outra pessoa** (jogo /luta/ 'Guitar Briga III', vite multi-page). NUNCA substituir o repo por tar: usar `/home/user/hz-publish.sh "msg"` (patch 3-way do que mudei desde o último publish; snapshot em /home/user/hz-last-pushed). Push 56a009e já inclui admin + salas oficiais + mouse.
+- 23:45 — **Carro BYD Dolphin Mini** (src/features/cars): R chama/entra/sai, WASD, Espaço drift, Shift sport, X buzina, Z câmera, atropela monstros/animais, passageiro (R perto de carro dirigido), réplica car:s/car:g. Testado (dirige, vira, sai). Próximo: futebol + minigames, criaturas (pixelmon-like).
+- 00:10 — **Futebol** (src/features/soccer) e **4 minigames novos** (Chão é Lava, Sumô, Battle Royale, Domínio) prontos; minigame.test 25/25. Próximo: criaturas estilo Pixelmon (task #16).
+- 00:55 — **Bichinhos (critters)**: 38 espécies, selvagens por bioma, cápsulas, grupo/caixa/dex (N), batalha selvagem + PvP determinística (testado 2 navegadores). battle.test 8/8. Todas as tarefas pedidas até aqui entregues; pendente: balanceamento, sons, mais minigames, testar online real.
+- 01:00 — hotkey I abre o painel de Futebol.
+- 01:05 — Memória reescrita (topo consolidado: visão, regras, publicação, mapa de features, testes, pendências).

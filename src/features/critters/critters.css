@@ -1,0 +1,23 @@
+.ck { max-height: 74vh; overflow: auto; }
+.ck-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+.ck-list { display: flex; flex-direction: column; gap: 8px; }
+.ck-row { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 12px; background: rgba(255,255,255,.04); }
+.ck-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; } .ck-info small { opacity: .7; }
+.ck-acts { display: flex; gap: 6px; }
+.ck-sprite { width: 56px; height: 56px; image-rendering: pixelated; flex: none; } .ck-sprite.unk { display: grid; place-items: center; font-size: 28px; opacity: .35; }
+.ck-types { display: inline-flex; gap: 4px; } .ck-types i { font-style: normal; font-size: 12px; padding: 1px 6px; border-radius: 10px; color: #111; }
+.ck-hp { height: 8px; border-radius: 4px; background: rgba(0,0,0,.5); overflow: hidden; border: 1px solid rgba(255,255,255,.18); } .ck-hp i { display: block; height: 100%; width: 100%; transition: width .45s ease, background .3s; }
+.ck-dex { display: grid; grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)); gap: 8px; } .ck-dcard { display: flex; flex-direction: column; align-items: center; padding: 6px; border-radius: 10px; background: rgba(255,255,255,.05); } .ck-dcard.unk canvas { filter: brightness(0); opacity: .35; } .ck-dcard small { margin-top: 3px; text-align: center; }
+.ck-starters { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 12px; }
+.ck-start { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: rgba(255,255,255,.06); color: inherit; cursor: pointer; } .ck-start:hover { background: rgba(255,179,107,.18); border-color: rgba(255,179,107,.6); } .ck-start canvas { width: 96px; height: 96px; image-rendering: pixelated; }
+.ck-btns { display: flex; gap: 8px; margin-top: 6px; }
+/* battle */
+.ck-battle { display: flex; flex-direction: column; gap: 10px; }
+.ck-foe, .ck-me { display: flex; align-items: center; gap: 14px; } .ck-foe { justify-content: space-between; } .ck-me { justify-content: space-between; flex-direction: row; }
+.ck-card { flex: 1; max-width: 320px; padding: 8px 12px; border-radius: 12px; background: rgba(0,0,0,.35); border: 1px solid var(--line); display: flex; flex-direction: column; gap: 5px; } .ck-card span { margin-left: 8px; opacity: .8; }
+.ck-bsp canvas { width: 120px; height: 120px; image-rendering: pixelated; } .ck-bsp.hit canvas { animation: ckhit .45s; } @keyframes ckhit { 20% { transform: translateX(-8px); filter: brightness(2.2); } 50% { transform: translateX(7px); } 100% { transform: none; } }
+.ck-log { height: 96px; overflow: auto; background: rgba(0,0,0,.4); border-radius: 10px; padding: 8px 10px; font: 13px/1.45 var(--mono); border: 1px solid var(--line); }
+.ck-bacts { display: flex; gap: 10px; flex-wrap: wrap; } .ck-moves { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; flex: 1; min-width: 260px; } .ck-side { display: flex; flex-direction: column; gap: 6px; }
+.ck-moves .btn { padding: 9px 8px; font-size: 13px; letter-spacing: 0; text-transform: none; min-height: 0; }
+.ck-side .btn { padding: 7px 10px; font-size: 12px; }
+.ck-battle { gap: 8px; } .ck-bsp canvas { width: 104px; height: 104px; } .ck-log { height: 84px; flex: none; }

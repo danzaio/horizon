@@ -35,13 +35,13 @@ export class Combat {
   sweep(ax, ay, az, dx, dy, dz, len, pad, opts) {
     const S = this.S; let bt = 1e9, kind = null, ref = null;
     const mobs = S.ctx.mobs && S.ctx.mobs.list;
-    if (mobs) for (let i = 0; i < mobs.length; i++) {
+    if (mobs && !(opts && opts.noMobs)) for (let i = 0; i < mobs.length; i++) {
       const m = mobs[i], sp = MOB[m.sp]; if (!sp) continue;
       const r = sp.r + pad, t = slab(ax, ay, az, dx, dy, dz, len, m.x - r, m.y - pad, m.z - r, m.x + r, m.y + sp.h + pad, m.z + r);
       if (t >= 0 && t < bt) { bt = t; kind = 'mob'; ref = m; }
     }
     const hl = S.ctx.horde && S.ctx.horde.list;
-    if (hl) for (let i = 0; i < hl.length; i++) {
+    if (hl && !(opts && opts.noMobs)) for (let i = 0; i < hl.length; i++) {
       const m = hl[i]; if (m.dead) continue;
       const r = m.r + pad, t = slab(ax, ay, az, dx, dy, dz, len, m.x - r, m.y - pad, m.z - r, m.x + r, m.y + m.h + pad, m.z + r);
       if (t >= 0 && t < bt) { bt = t; kind = 'mon'; ref = m; }

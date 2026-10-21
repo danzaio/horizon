@@ -26,3 +26,19 @@ Mapa redondo no canto superior direito: terreno analítico (mostra até terra ai
 * **Ver:** menu inicial → "🌍 Salas públicas": lista nome, dono, tipo de planeta e jogadores (n/8); "Entrar" abre o fluxo normal de entrada por código.
 * **Listar a sua:** no painel Online (`O`), modo **Aberto** → "🌍 Listar na lista pública" (nome editável). Só aparece enquanto o domo está Aberto; "Remover da lista" desfaz; fechar o domo também.
 * Como funciona sem servidor: uma sala Trystero fixa ("lobby", mesmas redes Nostr/Torrent/MQTT do convite); hosts anunciam `{código, nome, dono, tipo, n/max}` a cada 5 s, o navegador de salas coleta (expira em 20 s). Dados sanitizados (`sanitizeAd`). API: `net.setPublic(on, nome)`, `lobbyJoin({onAd,getAd})`.
+
+## Carro (BYD Dolphin Mini)
+`R` chama o carro / entra / sai (botão 🚗). `W S` acelera e ré, `A D` vira, `Espaço` freio de mão (drift), `Shift` sport, `X` buzina, `Z` câmera externa↔motorista, roda do mouse afasta a câmera. Sobe degraus de 1 bloco, pula rampas, atropela monstros da horda e animais. Outro jogador perto de um carro dirigido aperta `R` e vira passageiro. Réplica: `car:s`, `car:g`. Carro tem cor por jogador (rosa/menta/azul/branco/amarelo/lilás).
+
+## Futebol (`src/features/soccer/`)
+Botão ⚽ ou tecla `I`: o anfitrião inicia → constrói um **estádio no céu** (44×26 + gols) 14 blocos acima, times alternados, contagem 3-2-1, 5 minutos, placar e "GOOOL!". Correr na bola dribla; `U` chuta na direção do olhar. A bola é simulada pela autoridade e replicada (`sc:s`, `sc:kick`, `sc:team`); no fim todos voltam ao ponto de origem.
+
+## Novos minigames (tecla Y)
+Chão é Lava (pedaços desabam em cadeia), Sumô (empurre para fora, bordas encolhem), Battle Royale (ilha com caixas de armas e bordas que caem), Domínio (3 pontos de controle, times).
+
+## Bichinhos (estilo Pixelmon) — `src/features/critters/`
+* **38 espécies originais** (12 linhas de 3 estágios + 2 lendárias), 8 tipos com tabela de vantagens (Fogo, Água, Planta, Elétrico, Terra, Gelo, Sombra, Vento), 34 golpes, evolução por nível, modelos voxel procedurais.
+* **Selvagens** aparecem no mundo por bioma (níveis crescem com a distância do spawn; lendários raros). Itens (inventário E → Especiais): **Cápsula**, **Super Cápsula** (+90 %), **Cápsula Mestra** (garantida). Botão esquerdo lança e abre a batalha, **botão direito desafia** o bichinho — ou o **jogador** — mirado.
+* **N / 🐾**: grupo (6), caixa, dex (n/38), "Curar todos" e lista de jogadores para desafiar. Primeiro uso: escolha do parceiro inicial.
+* **Batalha por turnos** (golpe, trocar, cápsula, fugir): vitórias dão XP, sobem de nível, aprendem golpes e evoluem. Contra jogadores é **determinística**: os dois clientes rodam o mesmo motor com a mesma semente e as mesmas ações (`pk:ch`, `pk:ac`, `pk:t`, `pk:end`) — sem host; amistoso (ninguém perde nada). Testes: `node src/features/critters/battle.test.mjs`.
+* Salvo em `localStorage` por identidade.
