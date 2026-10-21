@@ -5,6 +5,47 @@
 Um mundo de blocos estilo Minecraft em **Three.js (WebGL2)** com **distância de visão praticamente infinita** — LOD no estilo *Distant Horizons* — pensado para rodar até em hardware fraco (GPU integrada, celulares antigos).
 Tudo é procedural: **nenhuma textura, fonte ou áudio externo**; funciona offline.
 
+## Bônus: Guitar Briga III — Lendas do Planalto (`/luta/`)
+
+Jogo de luta satírico entre caricaturas do Lula e do Flávio, no estilo de *Guitar Hero III: Legends of Rock*: luta em **3D com Three.js** (toon shading em 3 tons, hachura de nanquim no shader, contorno por casco invertido, palco com treliças, amplificadores, bateria, feixes de luz volumétricos, plateia e o Congresso ao fundo) e telas de título/VS em **ilustração 2D**, como as telas de loading do GH3. Música e efeitos 100% procedurais (WebAudio). É paródia, só um jogo.
+
+* `npm run dev` → http://localhost:5173/luta/ (no build: `dist/luta/index.html`, publicado junto no GitHub Pages).
+* **Jogar online de qualquer PC/celular:**
+  * *GitHub Pages*: depois do merge na `main`, o workflow publica em https://danzaio.github.io/horizon/luta/ (link permanente).
+  * *Link temporário na hora*: `npm run luta:online` sobe o jogo e um túnel público (usa `cloudflared` se estiver instalado, senão `localtunnel` via npx) e imprime a URL para mandar a quem for jogar.
+  * *Um arquivo só*: `npm run build:luta` gera `dist-luta/index.html` (~690 kB, tudo embutido): abre com duplo clique, ou é só jogar em qualquer hospedagem estática.
+* **1 jogador** (contra a CPU) ou **2 jogadores** no mesmo teclado; controles de toque no celular.
+* Melhor de 3 rounds, 99 s. Bater/apanhar enche o **star power**: ¼ libera um especial, cheio libera o **SOLO** — um mini Guitar Hero de 3 trilhas (F/G/H) em que cada nota acertada solta um raio no adversário.
+
+| Ação | J1 | J2 |
+|---|---|---|
+| Andar / pular / agachar | `A` `D` / `W` / `S` | setas |
+| Defender | segurar para trás (agachado defende golpes baixos) | idem |
+| Soco · Chute · Golpe pesado | `F` · `G` · `H` | `J` · `K` · `L` (ou Numpad 1-3) |
+| Especial · Especial 2 | `R` · `S`+`R` | `U` · `↓`+`U` (ou Numpad 4) |
+| Solo | `T` | `I` (ou Numpad 5) |
+| Pausa · Som | `Esc` · `M` | |
+
+| | Lula "O Barba" | Flávio "Zero Um" |
+|---|---|---|
+| Especial | **Foice e Martelo** (emblema giratório) | **Bola Zero Um** |
+| Especial 2 | **Libera o Sigilo!** (balão que atordoa e espalha extratos bancários) | **E o Lulinha?** (balão que deixa o Lula tonto: "MUDOU DE ASSUNTO!") |
+| Pesado | **Martelada** | **Guitarrada** |
+| Super | Solo do Companheiro | Solo Zero Um |
+
+**Participações especiais** (eventos aleatórios no meio do round, valem para os dois): o **Zé Gotinha** entra correndo e deixa uma vacina (+15 de vida para quem pegar); o **Vorcaro** atravessa o palco com a maleta jogando "CDB a 140% do CDI" (cada nota dá star power) até o "BANCO MASTER: LIQUIDADO!" queimar o que sobrou. E um pato amarelo gigante inflável flutua atrás do palco. A CPU também corre atrás dos itens.
+
+**Torcidas.** Cada lutador tem a sua, de um lado do palco, com flâmulas e placas na plateia, faixa com o nome e um puxador de megafone num tablado:
+
+| | Lula | Flávio |
+|---|---|---|
+| Torcida | **EXÉRCITO DO LULA** | **TROPA DO FLÁVIO** |
+| Puxador | **Janones** (grita **"EXPLODE!!!"**) | **Nikolas Ferreira "Chupetinha"** (grita "AVANTE, TROPA!!!") |
+
+Acertar golpes enche o medidor da torcida (barra sob o star power); ao encher, o puxador grita (balão na tela, voz via síntese de fala do navegador quando disponível) e o lutador ganha +4 de vida e +12 de star power. A torcida do vencedor comemora no fim do round. Os textos ficam em `CHARS.*.torcida` no `luta/src/main.js`.
+
+Código em `luta/`: `src/main.js` (lógica, IA, solo, HUD, telas 2D, áudio), `src/three/stage.js` (palco, câmera de luta, luzes, plateia, projéteis), `src/three/rocker.js` (personagens 3D montados com primitivas e texturas pintadas em canvas, guiados pelos mesmos ângulos de pose da lógica; IK nos braços durante o solo), `src/three/toon.js` (materiais toon + hachura + contorno), `src/three/extras.js` (Zé Gotinha, vacina, Vorcaro, pato, puxadores das torcidas). Para testes: `?scene=title|mode|select|vs|fight|result&mode=1|2&mute=1` e `window.__gb` (`game`, `step(n)`, `startSolo`, `r3`).
+
 ## Rodar
 
 ```bash
